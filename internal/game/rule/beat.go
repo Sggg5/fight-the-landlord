@@ -90,15 +90,7 @@ func findWinningStraight(analysis HandAnalysis, opponentHand ParsedHand) bool {
 	}
 
 	for i := 0; i <= len(availableRanks)-length; i++ {
-		// 检查连续序列
-		isStraight := true
-		for j := 1; j < length; j++ {
-			if availableRanks[i+j-1]+1 != availableRanks[i+j] {
-				isStraight = false
-				break
-			}
-		}
-		if isStraight && availableRanks[i] > opponentHand.KeyRank {
+		if isContinuousSequence(availableRanks, i, length) && availableRanks[i] > opponentHand.KeyRank {
 			return true
 		}
 	}
@@ -123,14 +115,7 @@ func findWinningPairStraight(analysis HandAnalysis, opponentHand ParsedHand) boo
 
 	// 使用与 findWinningStraight 相同的滑动窗口逻辑
 	for i := 0; i <= len(pairRanks)-length; i++ {
-		isPairStraight := true
-		for j := 1; j < length; j++ {
-			if pairRanks[i+j-1]+1 != pairRanks[i+j] {
-				isPairStraight = false
-				break
-			}
-		}
-		if isPairStraight && pairRanks[i] > opponentHand.KeyRank {
+		if isContinuousSequence(pairRanks, i, length) && pairRanks[i] > opponentHand.KeyRank {
 			return true
 		}
 	}
