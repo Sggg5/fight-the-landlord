@@ -52,6 +52,7 @@ func (gs *GameSession) handleCall(player *GamePlayer, bid bool) {
 		gs.landlordCandidate = gs.currentBidder
 		gs.bidMultiplier = 1
 		gs.bidPasses = 0
+		gs.grabActions = 0
 
 		gs.broadcastBidResult(player, true, false)
 
@@ -84,11 +85,15 @@ func (gs *GameSession) handleGrab(player *GamePlayer, bid bool) {
 	} else {
 		gs.bidPasses++
 	}
+	gs.grabActions++
 
 	gs.broadcastBidResult(player, bid, true)
 
-	// 除暂定地主外的两名玩家都放弃 → 抢地主结束
-	if gs.bidPasses >= 2 {
+	// 抢地主结束条件（满足其一）：
+	//   1. 除暂定地主外的两名玩家连续放弃；
+	//   2. 每名玩家都已抢过一次（叫地主者 A 之后 B、C、A 依次决策，最多 3 次），
+	//      防止互相反抢导致倍数无限翻倍。
+	if gs.bidPasses >= 2 || gs.grabActions >= 3 {
 		gs.setLandlord(gs.landlordCandidate)
 		return
 	}

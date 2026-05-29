@@ -82,6 +82,38 @@ func TestHandleBid_Grab_DoublesMultiplier(t *testing.T) {
 	assert.Equal(t, 2, gs.bidMultiplier)
 }
 
+func TestHandleBid_AllGrab_EndsAfterOneRound(t *testing.T) {
+	t.Parallel()
+
+	r := room.NewMockRoom("TEST123", testutil.NewSimpleClient("p1", "Player1"))
+	r.Players["p2"] = &room.RoomPlayer{Client: testutil.NewSimpleClient("p2", "Player2"), Seat: 1}
+	r.Players["p3"] = &room.RoomPlayer{Client: testutil.NewSimpleClient("p3", "Player3"), Seat: 2}
+	r.PlayerOrder = []string{"p1", "p2", "p3"}
+
+	gs := NewGameSession(r, storage.NewLeaderboardManager(nil), config.GameConfig{TurnTimeout: 30, BidTimeout: 15})
+	gs.Start()
+
+	// A 叫地主，随后 B、C、A 依次抢（每人最多一次），抢地主必须结束，倍数不会无限翻倍
+	caller := gs.players[gs.currentBidder]
+	require.NoError(t, gs.HandleBid(caller.ID, true))
+
+	// 抢地主阶段所有人都抢：B、C 与叫地主者 A 的反抢，共 3 次决策
+	grabbers := make([]string, 0, 3)
+	for range 3 {
+		p := gs.players[gs.currentBidder]
+		grabbers = append(grabbers, p.ID)
+		require.NoError(t, gs.HandleBid(p.ID, true))
+	}
+
+	// 抢满一轮后强制结束，进入出牌阶段
+	assert.Equal(t, GameStatePlaying, gs.state)
+	// 3 次抢，倍数翻 3 次：1 → 2 → 4 → 8
+	assert.Equal(t, 8, gs.bidMultiplier)
+	// 最后一个抢地主者（叫地主者 A 的反抢）成为地主
+	assert.Equal(t, grabbers[len(grabbers)-1], gs.players[gs.landlordCandidate].ID)
+	assert.True(t, caller.IsLandlord)
+}
+
 func TestHandleBid_NotYourTurn(t *testing.T) {
 	t.Parallel()
 

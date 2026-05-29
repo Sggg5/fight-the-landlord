@@ -45,6 +45,7 @@ func (gs *GameSession) dealNewRound() {
 	gs.landlordCaller = -1
 	gs.landlordCandidate = -1
 	gs.bidPasses = 0
+	gs.grabActions = 0
 	gs.bidMultiplier = 1
 	gs.bombCount = 0
 	gs.landlordPlays = 0
