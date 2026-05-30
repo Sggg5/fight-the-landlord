@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gopxl/beep/v2"
@@ -17,13 +18,21 @@ import (
 
 type SoundManager struct {
 	buffers map[string]*beep.Buffer
-	enabled bool
+	enabled bool // 扬声器是否初始化成功
+
+	// bgmMu guards the mute flag and the background-music controller, which can
+	// be touched both from the init goroutine and the UI goroutine.
+	bgmMu   sync.Mutex
+	muted   bool       // 是否静音（启动后默认静音，需手动开启）；同时控制事件音效与 BGM
+	bgmCtrl *beep.Ctrl // 常驻 mixer 的 BGM 控制器，用于暂停/恢复/切换曲目
+	bgmName string     // 当前 BGM 曲目名（避免重复切换同一首）
 }
 
 func NewSoundManager() *SoundManager {
 	return &SoundManager{
 		buffers: make(map[string]*beep.Buffer),
 		enabled: false,
+		muted:   true,
 	}
 }
 
@@ -43,12 +52,13 @@ func (sm *SoundManager) Init() error {
 	return nil
 }
 
-// loadSoundFiles loads all sound files from the assets/sounds directory
+// loadSoundFiles loads every sound file from the assets/sounds directory,
+// keyed by its filename without extension (e.g. deal.mp3 -> "deal").
 func (sm *SoundManager) loadSoundFiles(sampleRate beep.SampleRate) error {
 	soundDir := "assets/sounds"
 	files, err := os.ReadDir(soundDir)
 	if err != nil {
-		// It's okay if directory doesn't exist, just no sounds
+		// It's okay if the directory doesn't exist, just no sounds.
 		if os.IsNotExist(err) {
 			return nil
 		}
@@ -60,25 +70,23 @@ func (sm *SoundManager) loadSoundFiles(sampleRate beep.SampleRate) error {
 			continue
 		}
 		name := file.Name()
-		ext := strings.ToLower(filepath.Ext(name))
-		baseName := strings.TrimSuffix(name, filepath.Ext(name))
-
-		if ext != ".mp3" && ext != ".wav" {
-			continue
-		}
-
-		if err := sm.loadSoundFile(soundDir, name, baseName, ext, sampleRate); err != nil {
-			// Continue loading other files even if one fails
+		key := strings.TrimSuffix(name, filepath.Ext(name))
+		if err := sm.loadSoundFile(soundDir, name, key, sampleRate); err != nil {
+			// Continue loading other files even if one fails.
 			continue
 		}
 	}
-
 	return nil
 }
 
-// loadSoundFile loads a single sound file into the buffer
-func (sm *SoundManager) loadSoundFile(soundDir, name, baseName, ext string, sampleRate beep.SampleRate) error {
-	path := filepath.Join(soundDir, name)
+// loadSoundFile loads a single sound file into the buffer under key `key`.
+func (sm *SoundManager) loadSoundFile(soundDir, rel, key string, sampleRate beep.SampleRate) error {
+	ext := strings.ToLower(filepath.Ext(rel))
+	if ext != ".mp3" && ext != ".wav" {
+		return nil
+	}
+
+	path := filepath.Join(soundDir, rel)
 	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return err
@@ -116,12 +124,18 @@ func (sm *SoundManager) loadSoundFile(soundDir, name, baseName, ext string, samp
 	buffer := beep.NewBuffer(standardFormat)
 	buffer.Append(resampled)
 
-	sm.buffers[baseName] = buffer
+	sm.buffers[key] = buffer
 	return nil
 }
 
 func (sm *SoundManager) Play(name string) {
 	if !sm.enabled {
+		return
+	}
+	sm.bgmMu.Lock()
+	muted := sm.muted
+	sm.bgmMu.Unlock()
+	if muted {
 		return
 	}
 
@@ -132,6 +146,80 @@ func (sm *SoundManager) Play(name string) {
 	}
 
 	speaker.Play(buffer.Streamer(0, buffer.Len()))
+}
+
+// PlayBGM switches the looping background track to the given sound. It is a
+// no-op if that track is already playing or the sound isn't loaded. The track
+// keeps looping and respects the current mute state (paused while muted).
+func (sm *SoundManager) PlayBGM(name string) {
+	if !sm.enabled {
+		return
+	}
+	sm.bgmMu.Lock()
+	defer sm.bgmMu.Unlock()
+
+	if sm.bgmName == name {
+		return
+	}
+	buffer, ok := sm.buffers[name]
+	if !ok {
+		return
+	}
+	looped, err := beep.Loop2(buffer.Streamer(0, buffer.Len()))
+	if err != nil {
+		return
+	}
+	sm.bgmName = name
+
+	if sm.bgmCtrl == nil {
+		// First track: register a single persistent controller in the mixer.
+		sm.bgmCtrl = &beep.Ctrl{Streamer: looped, Paused: sm.muted}
+		speaker.Play(sm.bgmCtrl)
+		return
+	}
+	// Swap the looping streamer in place so we don't pile up mixer entries.
+	speaker.Lock()
+	sm.bgmCtrl.Streamer = looped
+	sm.bgmCtrl.Paused = sm.muted
+	speaker.Unlock()
+}
+
+// StopBGM stops the background music and drops it from the mixer, so a later
+// PlayBGM starts fresh.
+func (sm *SoundManager) StopBGM() {
+	sm.bgmMu.Lock()
+	defer sm.bgmMu.Unlock()
+
+	if sm.bgmCtrl == nil {
+		return
+	}
+	speaker.Lock()
+	sm.bgmCtrl.Streamer = nil // drained -> mixer removes it
+	speaker.Unlock()
+	sm.bgmCtrl = nil
+	sm.bgmName = ""
+}
+
+// Muted reports whether sound is currently muted.
+func (sm *SoundManager) Muted() bool {
+	sm.bgmMu.Lock()
+	defer sm.bgmMu.Unlock()
+	return sm.muted
+}
+
+// ToggleMute flips the global mute state and returns the new value (true =
+// muted). It pauses/resumes the background music and gates event sounds.
+func (sm *SoundManager) ToggleMute() bool {
+	sm.bgmMu.Lock()
+	defer sm.bgmMu.Unlock()
+
+	sm.muted = !sm.muted
+	if sm.bgmCtrl != nil {
+		speaker.Lock()
+		sm.bgmCtrl.Paused = sm.muted
+		speaker.Unlock()
+	}
+	return sm.muted
 }
 
 func (sm *SoundManager) Close() {

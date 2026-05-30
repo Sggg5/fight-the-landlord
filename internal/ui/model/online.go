@@ -197,6 +197,9 @@ func (m *OnlineModel) GetCurrentNotification() *SystemNotification {
 func (m *OnlineModel) EnterLobby() {
 	m.phase = PhaseLobby
 	m.error = ""
+
+	// 大厅保持安静，停止对局背景音乐
+	m.soundManager.StopBGM()
 	m.input.Reset()
 	m.input.Placeholder = "输入选项 (1-6) 或房间号"
 	m.input.Focus()
@@ -212,6 +215,10 @@ func (m *OnlineModel) SetMaintenanceMode(mode bool)     { m.maintenanceMode = mo
 func (m *OnlineModel) MatchingStartTime() time.Time     { return m.matchingStartTime }
 func (m *OnlineModel) SetMatchingStartTime(t time.Time) { m.matchingStartTime = t }
 func (m *OnlineModel) PlaySound(name string)            { m.soundManager.Play(name) }
+func (m *OnlineModel) PlayBGM(name string)              { m.soundManager.PlayBGM(name) }
+func (m *OnlineModel) StopBGM()                         { m.soundManager.StopBGM() }
+func (m *OnlineModel) ToggleMute() bool                 { return m.soundManager.ToggleMute() }
+func (m *OnlineModel) Muted() bool                      { return m.soundManager.Muted() }
 
 // LobbyDirect returns the concrete LobbyModel for internal use.
 func (m *OnlineModel) LobbyDirect() *LobbyModel { return m.lobby }
@@ -292,10 +299,30 @@ func (m *OnlineModel) dispatchMessage(msg tea.Msg) (cmds []tea.Cmd, earlyReturn 
 		}
 
 	case timer.TickMsg, timer.TimeoutMsg:
-		// Timer updates handled here
+		// 出牌倒计时进入最后 10 秒时播放一次提醒音
+		m.checkPlayReminder()
 	}
 
 	return cmds, false, nil
+}
+
+// checkPlayReminder plays the "出牌提醒" sound once when the local player's
+// play countdown enters its final 10 seconds.
+func (m *OnlineModel) checkPlayReminder() {
+	if m.phase != PhasePlaying || m.game.BellPlayed() {
+		return
+	}
+	if m.game.State().CurrentTurn != m.playerID {
+		return
+	}
+	start := m.game.TimerStartTime()
+	if start.IsZero() {
+		return
+	}
+	if m.game.TimerDuration()-time.Since(start) <= 10*time.Second {
+		m.PlaySound("turn")
+		m.game.SetBellPlayed(true)
+	}
 }
 
 // Update handles tea messages.
@@ -351,9 +378,16 @@ func (m *OnlineModel) View() tea.View {
 		}
 	}
 
+	// 播放声音（未静音）时在终端标签标题加上喇叭 emoji
+	title := "欢乐斗地主"
+	if !m.Muted() {
+		title = "🔊 " + title
+	}
+
 	return tea.View{
-		Content:   common.DocStyle.Render(content),
-		AltScreen: true,
+		Content:     common.DocStyle.Render(content),
+		AltScreen:   true,
+		WindowTitle: title,
 	}
 }
 

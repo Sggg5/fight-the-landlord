@@ -407,7 +407,7 @@ func renderPrompt(m model.Model, game model.GameAccessor, state *gameClient.Game
 		sb.WriteString(m.Input().View())
 	} else {
 		// When waiting, show quick message hint
-		quickMsgHint := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("C 键记牌器, T 键快捷消息, H 键帮助")
+		quickMsgHint := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("C 键记牌器, T 键快捷消息, H 键帮助, M 键声音")
 		sb.WriteString(quickMsgHint)
 	}
 
