@@ -36,7 +36,8 @@ type SoundManager struct {
 	bgmMu   sync.Mutex
 	muted   bool       // 是否静音（启动后默认静音，需手动开启）；同时控制事件音效与 BGM
 	bgmCtrl *beep.Ctrl // 常驻 mixer 的 BGM 控制器，用于暂停/恢复/切换曲目
-	bgmName string     // 当前 BGM 曲目名（避免重复切换同一首）
+	bgmName string     // 当前正在播放的 BGM 曲目名（避免重复切换同一首）
+	bgmWant string     // 期望播放的 BGM 曲目名；扬声器就绪后据此启动，解决初始化竞态
 }
 
 func NewSoundManager() *SoundManager {
@@ -53,12 +54,18 @@ func (sm *SoundManager) Init() error {
 	if err := speaker.Init(sampleRate, sampleRate.N(time.Second/10)); err != nil {
 		return fmt.Errorf("failed to initialize speaker: %w", err)
 	}
-	sm.enabled = true
-
 	// Load sounds from the embedded filesystem
 	if err := sm.loadSoundFiles(sampleRate); err != nil {
 		return err
 	}
+
+	// Mark ready and start any BGM requested before init finished (e.g. the
+	// lobby welcome track, which fires on connect — typically before this
+	// async init completes).
+	sm.bgmMu.Lock()
+	sm.enabled = true
+	sm.startBGMLocked()
+	sm.bgmMu.Unlock()
 
 	return nil
 }
@@ -184,20 +191,28 @@ func (sm *SoundManager) PlaySequence(names ...string) {
 	speaker.Play(beep.Seq(streamers...))
 }
 
-// PlayBGM switches the looping background track to the given sound. It is a
-// no-op if that track is already playing or the sound isn't loaded. The track
+// PlayBGM switches the looping background track to the given sound. The track
 // keeps looping and respects the current mute state (paused while muted).
+//
+// The request is remembered in bgmWant even if the speaker isn't ready or the
+// sound hasn't loaded yet, so Init can start it once both are. This avoids a
+// startup race where PlayBGM (e.g. the lobby's welcome track) fires before the
+// async sound init finishes and would otherwise be silently dropped forever.
 func (sm *SoundManager) PlayBGM(name string) {
-	if !sm.enabled {
-		return
-	}
 	sm.bgmMu.Lock()
 	defer sm.bgmMu.Unlock()
+	sm.bgmWant = name
+	sm.startBGMLocked()
+}
 
-	if sm.bgmName == name {
+// startBGMLocked (re)starts the wanted BGM track in the mixer. The caller must
+// hold bgmMu. It is a no-op if the speaker isn't ready, no track is wanted, the
+// wanted track is already playing, or it isn't loaded.
+func (sm *SoundManager) startBGMLocked() {
+	if !sm.enabled || sm.bgmWant == "" || sm.bgmName == sm.bgmWant {
 		return
 	}
-	buffer, ok := sm.buffers[name]
+	buffer, ok := sm.buffers[sm.bgmWant]
 	if !ok {
 		return
 	}
@@ -205,7 +220,7 @@ func (sm *SoundManager) PlayBGM(name string) {
 	if err != nil {
 		return
 	}
-	sm.bgmName = name
+	sm.bgmName = sm.bgmWant
 
 	if sm.bgmCtrl == nil {
 		// First track: register a single persistent controller in the mixer.
@@ -246,6 +261,7 @@ func (sm *SoundManager) StopBGM() {
 	sm.bgmMu.Lock()
 	defer sm.bgmMu.Unlock()
 
+	sm.bgmWant = "" // clear desire so a pending start doesn't revive it
 	if sm.bgmCtrl == nil {
 		return
 	}

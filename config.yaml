@@ -58,7 +58,7 @@ security:
 bot:
   # 是否启用机器人（冷启动填充）
   enabled: true
-  # 玩家等待多少秒后由填充剩余座位
+  # 玩家等待多少秒后由机器人填充剩余座位
   bot_fill_timeout: 15
 
   # --- DouZero 引擎 ---
