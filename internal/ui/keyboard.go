@@ -197,12 +197,15 @@ func HandleKeyPress(m model.Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	case tea.KeyEsc:
 		return handleEscKey(m)
 	case tea.KeyUp:
+		playMenuFeedback(m)
 		m.Lobby().HandleUpKey(m.Phase())
 		return false, nil
 	case tea.KeyDown:
+		playMenuFeedback(m)
 		m.Lobby().HandleDownKey(m.Phase())
 		return false, nil
 	case tea.KeyEnter:
+		playMenuFeedback(m)
 		cmd := handleEnter(m)
 		return false, cmd
 	default:
@@ -214,6 +217,14 @@ func HandleKeyPress(m model.Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 		}
 	}
 	return false, nil
+}
+
+// playMenuFeedback 在大厅 / 房间列表用上下键导航或回车选择时给出按键音反馈
+func playMenuFeedback(m model.Model) {
+	switch m.Phase() {
+	case model.PhaseLobby, model.PhaseRoomList:
+		m.PlaySound("menu")
+	}
 }
 
 func handleEscKey(m model.Model) (bool, tea.Cmd) {
@@ -243,6 +254,16 @@ func handleRuneKey(m model.Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	runes := []rune(msg.Key().Text)
 	if len(runes) == 0 {
 		return false, nil
+	}
+
+	// Mute toggle works in any phase
+	if runes[0] == 'm' || runes[0] == 'M' {
+		if muted := m.ToggleMute(); muted {
+			m.SetNotification(model.NotifyInfo, "🔇 已静音", true)
+		} else {
+			m.SetNotification(model.NotifyInfo, "🔊 声音已开启", true)
+		}
+		return true, clearSystemNotification()
 	}
 
 	// Handle game toggles (only during bidding/playing)

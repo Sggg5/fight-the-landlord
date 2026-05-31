@@ -41,6 +41,7 @@ const (
 	NotifyReconnectSuccess                         // 重连成功（临时）
 	NotifyMaintenance                              // 维护通知（持久）
 	NotifyOnlineCount                              // 在线人数（持久）
+	NotifyInfo                                     // 一般信息提示（临时）
 )
 
 // SystemNotification represents a system notification.
@@ -127,6 +128,12 @@ type Model interface {
 
 	// Sound
 	PlaySound(name string)
+	PlaySequence(names ...string)
+	PlayBGM(name string)
+	PlayBGMAnyOf(names ...string)
+	StopBGM()
+	ToggleMute() bool
+	Muted() bool
 
 	// Dimensions
 	Width() int

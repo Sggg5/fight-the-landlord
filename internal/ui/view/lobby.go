@@ -25,6 +25,8 @@ func getNotificationStyle(notifyType model.NotificationType) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	case model.NotifyOnlineCount:
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	case model.NotifyInfo:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	default:
 		return lipgloss.NewStyle()
 	}

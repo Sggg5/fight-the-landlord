@@ -116,10 +116,13 @@ docker compose down
 # 1. 启动 Redis
 redis-server
 
-# 2. 启动服务端
+# 2. 启动 douzero 机器人
+cd douzero && uv sync && uv run python server.py
+
+# 3. 启动服务端
 go run ./cmd/server
 
-# 3. 启动客户端（开 3 个终端）
+# 4. 启动客户端
 go run ./cmd/client
 ```
 

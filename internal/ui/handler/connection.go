@@ -44,17 +44,28 @@ func handleMsgReconnected(m model.Model, msg *protocol.Message) tea.Cmd {
 	_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetOnlineCount, nil))
 	_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetMaintenanceStatus, nil))
 
-	if payload.RoomCode != "" {
-		m.Game().State().RoomCode = payload.RoomCode
-		if payload.GameState != nil {
-			m.SetPhase(model.PhasePlaying)
-		} else {
-			m.SetPhase(model.PhaseWaiting)
-		}
-	} else {
+	// 不在房间内：回到大厅
+	if payload.RoomCode == "" {
 		m.SetPhase(model.PhaseLobby)
 		m.Input().Placeholder = "输入选项 (1-5) 或房间号"
 		m.Input().Focus()
+		return nil
+	}
+
+	m.Game().State().RoomCode = payload.RoomCode
+
+	// 无游戏快照：仍在等待开局
+	if payload.GameState == nil {
+		m.SetPhase(model.PhaseWaiting)
+		return nil
+	}
+
+	// 用服务器快照覆盖本地状态，避免显示掉线前的过期数据
+	restoreGameState(m, payload.GameState)
+	if payload.GameState.Phase == "bidding" {
+		m.SetPhase(model.PhaseBidding)
+	} else {
+		m.SetPhase(model.PhasePlaying)
 	}
 	return nil
 }

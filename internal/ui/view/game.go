@@ -65,6 +65,7 @@ func RenderGameRules() string {
 	sb += "• C：切换记牌器（游戏中）\n"
 	sb += "• T：切换快捷消息（游戏中）\n"
 	sb += "• H：显示/隐藏帮助（游戏中）\n"
+	sb += "• M：开启/关闭声音（默认静音）\n"
 	sb += "• ESC：返回上一级或退出\n"
 
 	return BoxStyle.Render(sb)

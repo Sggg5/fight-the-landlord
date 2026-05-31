@@ -2,7 +2,9 @@
 package view
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -63,7 +65,7 @@ func WaitingView(m model.Model) string {
 		if p.ID == m.PlayerID() {
 			meStr = " (你)"
 		} else if p.IsBot {
-			meStr = " (AI)"
+			meStr = " (Bot)"
 		}
 		fmt.Fprintf(&playerList, "  %s %s%s\n", readyStr, p.Name, meStr)
 	}
@@ -182,10 +184,12 @@ func GameOverView(m model.Model) string {
 	}
 	sb.WriteString("\n按 ESC 返回大厅")
 
-	return lipgloss.NewStyle().
+	content := lipgloss.NewStyle().
 		Width(width).
 		Align(lipgloss.Center).
 		Render(sb.String())
+
+	return lipgloss.Place(width, m.Height(), lipgloss.Center, lipgloss.Center, content)
 }
 
 // --- Helper rendering functions ---
@@ -293,10 +297,57 @@ func renderMiddleSection(state *gameClient.GameState, myPlayerID string) string 
 	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
 
+// groupPlayedForDisplay 将一手牌按"主牌在前、附牌在后"重排，便于阅读。
+// 主牌为出现次数最多的点数组（三条/四条/飞机的主体），其余为附牌（单牌或对子）；
+// 主牌与附牌各自按点数从大到小排列。对不带牌的牌型（单、对、顺子、连对、纯飞机、
+// 炸弹、王炸等）所有牌出现次数相同，结果等价于按点数降序，不改变原有展示。
+func groupPlayedForDisplay(cards []card.Card) []card.Card {
+	if len(cards) <= 1 {
+		return cards
+	}
+
+	// 按点数分组，并记录最大组的牌数（即主牌的张数：3=三条/飞机，4=四条）
+	byRank := make(map[card.Rank][]card.Card)
+	order := make([]card.Rank, 0, len(cards))
+	maxCount := 0
+	for _, c := range cards {
+		if _, ok := byRank[c.Rank]; !ok {
+			order = append(order, c.Rank)
+		}
+		byRank[c.Rank] = append(byRank[c.Rank], c)
+		if n := len(byRank[c.Rank]); n > maxCount {
+			maxCount = n
+		}
+	}
+
+	var mainRanks, kickerRanks []card.Rank
+	for _, r := range order {
+		if len(byRank[r]) == maxCount {
+			mainRanks = append(mainRanks, r)
+		} else {
+			kickerRanks = append(kickerRanks, r)
+		}
+	}
+	descByRank := func(a, b card.Rank) int { return cmp.Compare(b, a) }
+	slices.SortFunc(mainRanks, descByRank)
+	slices.SortFunc(kickerRanks, descByRank)
+
+	out := make([]card.Card, 0, len(cards))
+	for _, r := range mainRanks {
+		out = append(out, byRank[r]...)
+	}
+	for _, r := range kickerRanks {
+		out = append(out, byRank[r]...)
+	}
+	return out
+}
+
 func renderLastPlayed(state *gameClient.GameState) string {
-	var cardStrs []string
-	for i := len(state.LastPlayed) - 1; i >= 0; i-- {
-		c := state.LastPlayed[i]
+	// 带牌（三带、四带、飞机带牌）时主牌在前、附牌在后，更符合阅读习惯；
+	// 组内与组间均按点数从大到小，与手牌方向一致（大牌在左）
+	grouped := groupPlayedForDisplay(state.LastPlayed)
+	cardStrs := make([]string, 0, len(grouped))
+	for _, c := range grouped {
 		style := common.BlackStyle
 		if c.Color == card.Red {
 			style = common.RedStyle
@@ -405,7 +456,7 @@ func renderPrompt(m model.Model, game model.GameAccessor, state *gameClient.Game
 		sb.WriteString(m.Input().View())
 	} else {
 		// When waiting, show quick message hint
-		quickMsgHint := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("C 键记牌器, T 键快捷消息, H 键帮助")
+		quickMsgHint := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("C 键记牌器, T 键快捷消息, H 键帮助, M 键声音")
 		sb.WriteString(quickMsgHint)
 	}
 
