@@ -261,6 +261,12 @@ func handleMsgCardPlayed(m model.Model, msg *protocol.Message) tea.Cmd {
 		m.Game().State().CardCounter.DeductCards(m.Game().State().LastPlayed)
 	}
 
+	playCardPlayedSounds(m, payload, isBeat)
+	return nil
+}
+
+// playCardPlayedSounds 根据本次出牌播放音效：出牌声/报牌或“压死”语音、剩牌提醒，并按场上剩牌切换 BGM。
+func playCardPlayedSounds(m model.Model, payload protocol.CardPlayedPayload, isBeat bool) {
 	m.PlaySound("play")
 	switch {
 	case isBeat && payload.HandType != rule.Bomb.String() && payload.HandType != rule.Rocket.String():
@@ -292,7 +298,6 @@ func handleMsgCardPlayed(m model.Model, msg *protocol.Message) tea.Cmd {
 	} else {
 		m.PlayBGM("bgm_normal")
 	}
-	return nil
 }
 
 func handleMsgGameOver(m model.Model, msg *protocol.Message) tea.Cmd {

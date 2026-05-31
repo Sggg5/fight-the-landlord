@@ -345,8 +345,9 @@ func groupPlayedForDisplay(cards []card.Card) []card.Card {
 func renderLastPlayed(state *gameClient.GameState) string {
 	// 带牌（三带、四带、飞机带牌）时主牌在前、附牌在后，更符合阅读习惯；
 	// 组内与组间均按点数从大到小，与手牌方向一致（大牌在左）
-	var cardStrs []string
-	for _, c := range groupPlayedForDisplay(state.LastPlayed) {
+	grouped := groupPlayedForDisplay(state.LastPlayed)
+	cardStrs := make([]string, 0, len(grouped))
+	for _, c := range grouped {
 		style := common.BlackStyle
 		if c.Color == card.Red {
 			style = common.RedStyle

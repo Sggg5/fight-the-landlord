@@ -39,7 +39,8 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # 版本须与 .pre-commit-config.yaml 保持一致，避免本地与 CI 结果不一致
+          version: v2.11.1
           args: --build-tags=ci
 
       - name: Run tests
