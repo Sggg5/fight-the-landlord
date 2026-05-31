@@ -320,7 +320,7 @@ func handleMsgGameOver(m model.Model, msg *protocol.Message) tea.Cmd {
 	var payload protocol.GameOverPayload
 	_ = payloadconv.DecodePayload(msg.Type, msg.Payload, &payload)
 
-	// 先存好结算数据，保持当前出牌画面展示最后一手牌，2 秒后再切结算页
+	// 先存好结算数据，保持当前出牌画面展示最后一手牌，3 秒后再切结算页
 	m.Game().State().Winner = payload.WinnerName
 	m.Game().State().WinnerIsLandlord = payload.IsLandlord
 	m.Game().State().FinalMultiplier = payload.Multiplier
@@ -333,7 +333,7 @@ func handleMsgGameOver(m model.Model, msg *protocol.Message) tea.Cmd {
 	}
 	m.StopBGM()
 
-	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+	return tea.Tick(3*time.Second, func(time.Time) tea.Msg {
 		return model.GameOverDelayMsg{}
 	})
 }
