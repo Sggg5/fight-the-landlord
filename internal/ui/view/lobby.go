@@ -16,21 +16,38 @@ import (
 func getNotificationStyle(notifyType model.NotificationType) lipgloss.Style {
 	switch notifyType {
 	case model.NotifyError, model.NotifyRateLimit:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+		return retroWarningStyle
 	case model.NotifyReconnecting:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+		return retroWarningStyle
 	case model.NotifyReconnectSuccess:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+		return retroOnlineStyle
 	case model.NotifyMaintenance:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
+		return retroWarningStyle
 	case model.NotifyOnlineCount:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+		return retroOnlineStyle
 	case model.NotifyInfo:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+		return retroBrightStyle
 	default:
-		return lipgloss.NewStyle()
+		return retroTextStyle
 	}
 }
+
+var (
+	retroBgColor      = lipgloss.Color("#06110b")
+	retroPanelColor   = lipgloss.Color("#07170d")
+	retroBorderColor  = lipgloss.Color("#1f8f48")
+	retroTextStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#6fa87d"))
+	retroDimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#355d42"))
+	retroBrightStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#8cff8c")).Bold(true)
+	retroOnlineStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#36ff62")).Bold(true)
+	retroWarningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd75f")).Bold(true)
+	retroGlowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#b6ff9d")).Bold(true)
+	retroPanelStyle   = lipgloss.NewStyle().
+				Background(retroPanelColor).
+				Border(lipgloss.NormalBorder()).
+				BorderForeground(retroBorderColor).
+				Padding(1, 2)
+)
 
 // renderChatBox renders the chat box component for the lobby.
 func renderChatBox(lobby model.LobbyAccessor, height int) string {
@@ -46,15 +63,19 @@ func renderChatBox(lobby model.LobbyAccessor, height int) string {
 			chatLines = append(chatLines, history[i])
 		}
 	} else {
-		chatLines = append(chatLines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("暂无消息..."))
+		chatLines = []string{
+			retroWarningStyle.Render("[系统] ") + retroTextStyle.Render("玩家 老王 进入大厅"),
+			retroWarningStyle.Render("[系统] ") + retroTextStyle.Render("正在等待匹配..."),
+			retroOnlineStyle.Render("[玩家] ") + retroTextStyle.Render("来一把经典场"),
+		}
 	}
 
 	chatInputView := lobby.ChatInput().View()
 	if !lobby.ChatInput().Focused() {
-		chatInputView = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("按 / 键聊天...")
+		chatInputView = retroDimStyle.Render("ENTER 输入聊天 / ↑↓ 选择菜单 ") + retroBrightStyle.Render("█")
 	}
 
-	chatHeader := lipgloss.NewStyle().Bold(true).Render("💬 聊天室")
+	chatHeader := retroGlowStyle.Render("WORLD CHAT")
 	innerHeight := height - 2
 	usedLines := 1 + len(chatLines) + 1 // header + chat + input
 	emptyLines := max(innerHeight-usedLines, 0)
@@ -68,7 +89,7 @@ func renderChatBox(lobby model.LobbyAccessor, height int) string {
 
 	chatBoxWidth := 50
 	chatBoxContent := lipgloss.JoinVertical(lipgloss.Left, contentLines...)
-	return common.BoxStyle.Width(chatBoxWidth).Height(innerHeight).Render(chatBoxContent)
+	return retroPanelStyle.Width(chatBoxWidth).Height(innerHeight).Render(chatBoxContent)
 }
 
 // LobbyView renders the lobby view.
@@ -76,75 +97,102 @@ func LobbyView(m model.Model) string {
 	lobby := m.Lobby()
 	var sb strings.Builder
 
-	title := common.TitleStyle("🎮 欢乐斗地主")
-	sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, title))
-	sb.WriteString("\n\n")
-
-	if m.PlayerName() != "" {
-		welcome := fmt.Sprintf("欢迎, %s!", m.PlayerName())
-		sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, welcome))
-		sb.WriteString("\n")
-
-		// Show system notification
-		if notification := m.GetCurrentNotification(); notification != nil {
-			notificationStyle := getNotificationStyle(notification.Type)
-			sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center,
-				notificationStyle.Render(notification.Message)))
-		}
-		sb.WriteString("\n")
-		sb.WriteString("\n")
+	screenWidth := max(min(m.Width()-4, 108), 84)
+	screenHeight := max(min(m.Height()-4, 32), 24)
+	playerName := m.PlayerName()
+	if playerName == "" {
+		playerName = "GUEST"
 	}
 
+	title := retroGlowStyle.Render("╔════════════════════════════════╗\n║        欢乐斗地主 DDZ         ║\n╚════════════════════════════════╝")
+	sb.WriteString(lipgloss.PlaceHorizontal(screenWidth, lipgloss.Center, title))
+	sb.WriteString("\n")
+
+	topBar := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		retroTextStyle.Render("PLAYER: "),
+		retroBrightStyle.Render(playerName),
+		retroDimStyle.Render("  |  "),
+		retroTextStyle.Render("ONLINE: "),
+		retroOnlineStyle.Render(fmt.Sprintf("%03d", lobby.OnlineCount())),
+		retroDimStyle.Render("  |  "),
+		retroWarningStyle.Render("DOS/CRT MODE"),
+	)
+	sb.WriteString(lipgloss.PlaceHorizontal(screenWidth, lipgloss.Center, topBar))
+	sb.WriteString("\n")
+
+	if notification := m.GetCurrentNotification(); notification != nil {
+		notificationStyle := getNotificationStyle(notification.Type)
+		sb.WriteString(lipgloss.PlaceHorizontal(screenWidth, lipgloss.Center,
+			notificationStyle.Render(notification.Message)))
+		sb.WriteString("\n")
+	}
+	sb.WriteString(retroDimStyle.Render(strings.Repeat("░", screenWidth)))
+	sb.WriteString("\n")
+
 	menuItems := []string{
-		"1. 快速匹配",
-		"2. 创建房间",
-		"3. 加入房间",
-		"4. 人机练习",
-		"5. 排行榜",
-		"6. 我的战绩",
-		"7. 游戏规则",
+		"[01] 快速匹配",
+		"[02] 创建房间",
+		"[03] 加入房间",
+		"[04] 人机练习",
+		"[05] 排行榜",
+		"[06] 我的战绩",
+		"[07] 游戏规则",
 	}
 
 	lobbyModel := m.Lobby()
 	menuLines := make([]string, 0, 2+len(menuItems))
-	menuLines = append(menuLines, "请选择:", "")
+	menuLines = append(menuLines, retroGlowStyle.Render("MAIN MENU"), "")
 	for i, item := range menuItems {
 		prefix := "  "
+		style := retroTextStyle
 		if i == lobbyModel.SelectedIndex() {
-			prefix = "▶ "
+			prefix = "> "
+			style = retroBrightStyle
 		}
-		menuLines = append(menuLines, prefix+item)
+		menuLines = append(menuLines, style.Render(prefix+item))
 	}
+	menuLines = append(menuLines, "", retroDimStyle.Render("SCANLINE: ACTIVE"))
 
-	menu := common.BoxStyle.Padding(0, 2).Render(lipgloss.JoinVertical(lipgloss.Left, menuLines...))
+	menu := retroPanelStyle.Width(30).Render(lipgloss.JoinVertical(lipgloss.Left, menuLines...))
 	menuHeight := lipgloss.Height(menu)
 
 	// Chat box
 	chatBox := renderChatBox(lobby, menuHeight)
 
 	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, menu, "  ", chatBox)
-	sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, mainContent))
-	sb.WriteString("\n\n")
+	sb.WriteString(lipgloss.PlaceHorizontal(screenWidth, lipgloss.Center, mainContent))
+	sb.WriteString("\n")
 
 	// Only show blinking cursor on lobby input when chat is not focused
 	var inputView string
 	if lobby.ChatInput().Focused() {
 		m.Input().Blur()
-		inputView = lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center,
-			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("> ↑↓ 选择 | 回车确认 | 或输入选项(1-7)/房间号"))
+		inputView = retroWarningStyle.Render("ENTER 输入聊天 / ↑↓ 选择菜单")
 	} else {
 		m.Input().Focus()
-		m.Input().Placeholder = "↑↓ 选择 | 回车确认 | 或输入选项(1-7)/房间号"
-		inputView = lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, m.Input().View())
+		m.Input().Placeholder = "ENTER 确认 / ↑↓ 选择菜单 / 输入房间号"
+		inputView = retroTextStyle.Render(m.Input().View()) + retroBrightStyle.Render(" █")
 	}
-	sb.WriteString(inputView)
+	footer := lipgloss.NewStyle().
+		Background(lipgloss.Color("#0a1e10")).
+		Foreground(lipgloss.Color("#c7ff7a")).
+		Width(screenWidth-4).
+		Padding(0, 2).
+		Render(inputView)
+	sb.WriteString(lipgloss.PlaceHorizontal(screenWidth, lipgloss.Center, footer))
 
-	creditStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
-	credit := creditStyle.Render("Made with ❤️ by Palemoky")
-	sb.WriteString("\n\n")
-	sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, credit))
+	sb.WriteString("\n")
+	vignette := retroDimStyle.Render("╚" + strings.Repeat("═", screenWidth-2) + "╝")
+	sb.WriteString(vignette)
 
-	content := sb.String()
+	content := lipgloss.NewStyle().
+		Width(screenWidth).
+		Height(screenHeight).
+		Background(retroBgColor).
+		Foreground(lipgloss.Color("#6fa87d")).
+		Padding(1, 2).
+		Render(sb.String())
 	return lipgloss.Place(m.Width(), m.Height(), lipgloss.Center, lipgloss.Center, content)
 }
 

@@ -43,7 +43,7 @@ type LobbyModel struct {
 // NewLobbyModel creates a new LobbyModel.
 func NewLobbyModel(c *transport.Client, input *textinput.Model) *LobbyModel {
 	chatInput := textinput.New()
-	chatInput.Placeholder = "按 / 键聊天..."
+	chatInput.Placeholder = "ENTER 输入聊天 / ↑↓ 选择菜单"
 	chatInput.CharLimit = 50
 	chatInput.SetWidth(chatInputWidth)
 
