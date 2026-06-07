@@ -20,6 +20,7 @@ const douzeroTimeout = 5 * time.Second
 type DouZeroEngine struct {
 	serviceURL string
 	httpClient *http.Client
+	fallback   DecisionEngine
 }
 
 // NewDouZeroEngine 创建 DouZero 引擎
@@ -27,7 +28,16 @@ func NewDouZeroEngine(serviceURL string) *DouZeroEngine {
 	return &DouZeroEngine{
 		serviceURL: serviceURL,
 		httpClient: &http.Client{Timeout: douzeroTimeout},
+		fallback:   NewHeuristicEngine(),
 	}
+}
+
+func NewDouZeroEngineWithFallback(serviceURL string, fallback DecisionEngine) *DouZeroEngine {
+	engine := NewDouZeroEngine(serviceURL)
+	if fallback != nil {
+		engine.fallback = fallback
+	}
+	return engine
 }
 
 // rankToDouZero 将项目 Rank 转为 DouZero card int
@@ -112,20 +122,20 @@ func (e *DouZeroEngine) DecidePlay(ctx context.Context, botName string, gctx Gam
 
 	if gctx.DouZeroPos == "" {
 		log.Printf("🎮 [DouZero] %s: 位置未知，回退规则出牌", botName)
-		return rule.FindSmallestBeatingCards(gctx.Hand, gctx.RecentPlays[0].Played)
+		return e.fallbackPlay(ctx, botName, gctx)
 	}
 
 	req := e.buildRequest(gctx)
 	action, err := e.callService(ctx, req)
 	if err != nil {
 		log.Printf("🎮 [DouZero] %s: 服务错误: %v，回退规则出牌", botName, err)
-		return rule.FindSmallestBeatingCards(gctx.Hand, gctx.RecentPlays[0].Played)
+		return e.fallbackPlay(ctx, botName, gctx)
 	}
 
 	if len(action) == 0 {
 		if gctx.MustPlay {
 			log.Printf("🎮 [DouZero] %s: 返回 pass 但必须出牌，回退规则出牌", botName)
-			return rule.FindSmallestBeatingCards(gctx.Hand, gctx.RecentPlays[0].Played)
+			return e.fallbackPlay(ctx, botName, gctx)
 		}
 		log.Printf("🎮 [DouZero] %s: pass", botName)
 		return nil
@@ -134,11 +144,34 @@ func (e *DouZeroEngine) DecidePlay(ctx context.Context, botName string, gctx Gam
 	cards := e.douzeroToCards(action, gctx.Hand)
 	if cards == nil {
 		log.Printf("🎮 [DouZero] %s: 牌面转换失败，回退规则出牌", botName)
-		return rule.FindSmallestBeatingCards(gctx.Hand, gctx.RecentPlays[0].Played)
+		return e.fallbackPlay(ctx, botName, gctx)
+	}
+
+	if !isLegalDouZeroAction(cards, gctx) {
+		log.Printf("[DouZero] %s returned illegal action; fallback", botName)
+		return e.fallbackPlay(ctx, botName, gctx)
 	}
 
 	log.Printf("🎮 [DouZero] %s 出牌: %s", botName, cardsToStr(cards))
 	return cards
+}
+
+func (e *DouZeroEngine) fallbackPlay(ctx context.Context, botName string, gctx GameContext) []card.Card {
+	if e.fallback == nil {
+		return rule.FindSmallestBeatingCards(gctx.Hand, gctx.RecentPlays[0].Played)
+	}
+	return e.fallback.DecidePlay(ctx, botName, gctx)
+}
+
+func isLegalDouZeroAction(cards []card.Card, gctx GameContext) bool {
+	parsed, err := rule.ParseHand(cards)
+	if err != nil || parsed.Type == rule.Invalid {
+		return false
+	}
+	if gctx.MustPlay || gctx.RecentPlays[0].Played.IsEmpty() {
+		return true
+	}
+	return rule.CanBeat(parsed, gctx.RecentPlays[0].Played)
 }
 
 func (e *DouZeroEngine) buildRequest(gctx GameContext) douzeroRequest {

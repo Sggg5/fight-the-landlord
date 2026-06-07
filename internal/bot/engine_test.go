@@ -32,6 +32,35 @@ func cards(notation string) []card.Card {
 	return result
 }
 
+func TestStrongHeuristicEngine_LeadPrefersCombination(t *testing.T) {
+	t.Parallel()
+	e := NewStrongHeuristicEngine()
+
+	gctx := GameContext{
+		Hand:     cards("3 4 5 6 7 9 K"),
+		MustPlay: true,
+	}
+	got := e.DecidePlay(context.Background(), "bot", gctx)
+	if cardsToStr(got) != "3 4 5 6 7" {
+		t.Fatalf("hard fallback should lead a straight, got %s", cardsToStr(got))
+	}
+}
+
+func TestStrongHeuristicEngine_SavesBombAgainstNormalHand(t *testing.T) {
+	t.Parallel()
+	e := NewStrongHeuristicEngine()
+
+	gctx := GameContext{
+		Hand:         cards("6 6 6 6 9"),
+		RecentPlays:  [2]PlayRecord{play("2", true), {}},
+		CanBeat:      true,
+		PlayerCounts: [2]int{8, 12},
+	}
+	if got := e.DecidePlay(context.Background(), "bot", gctx); got != nil {
+		t.Fatalf("hard fallback should save bomb when opponent is not close to winning, got %s", cardsToStr(got))
+	}
+}
+
 // play 从牌面字符串构建 PlayRecord
 func play(notation string, isLandlord bool) PlayRecord {
 	c := cards(notation)

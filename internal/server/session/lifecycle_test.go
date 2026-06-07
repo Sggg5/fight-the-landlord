@@ -108,6 +108,27 @@ func TestEndGame_WinnerAnnounced(t *testing.T) {
 	assert.Equal(t, room.RoomStateEnded, r.State)
 }
 
+func TestEndGame_NilRoomPlayerClientDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	r := room.NewMockRoom("TEST123", testutil.NewSimpleClient("p1", "Player1"))
+	r.Players["p2"] = &room.RoomPlayer{Client: nil, Seat: 1}
+	r.Players["p3"] = &room.RoomPlayer{Client: nil, Seat: 2}
+	r.PlayerOrder = []string{"p1", "p2", "p3"}
+
+	gs := NewGameSession(r, storage.NewLeaderboardManager(nil), config.GameConfig{TurnTimeout: 30, BidTimeout: 15})
+	gs.Start()
+
+	winner := gs.players[0]
+	winner.IsLandlord = true
+
+	assert.NotPanics(t, func() {
+		gs.endGame(winner)
+	})
+	assert.Equal(t, GameStateEnded, gs.state)
+	assert.Equal(t, room.RoomStateEnded, r.State)
+}
+
 func TestNewGameSession_Initialization(t *testing.T) {
 	t.Parallel()
 

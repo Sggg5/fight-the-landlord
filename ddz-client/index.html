@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三国斗地主</title>
+    <link rel="stylesheet" href="./styles.css?v=20260607-20" />
+    <script src="./protobuf.min.js"></script>
+    <script src="./src/skin/skinConfig.js?v=20260606-3"></script>
+    <script src="./src/skin/skinManager.js?v=20260606-3"></script>
+    <script src="./src/game/dialogueRuntime.js?v=20260607-1"></script>
+    <script src="./src/game/femalePersonalities.js?v=20260607-1"></script>
+  </head>
+  <body data-screen="lobby">
+    <main class="app-shell">
+      <section id="lobbyView" class="app-view lobby-view" aria-label="三国斗地主入口大厅">
+        <header class="lobby-topbar">
+          <div class="lobby-profile">
+            <span class="seal-mark">DDZ</span>
+            <div><strong id="playerLabel">未连接</strong><span>三国群英 · 等你开局</span></div>
+          </div>
+          <div class="lobby-network">
+            <span class="yuanzi-balance">元子 <strong id="yuanziText">0</strong></span>
+            <span>状态 <strong id="statusText">等待连接</strong></span>
+            <span>延迟 <strong id="latencyText">-- ms</strong></span>
+            <span>在线 <strong id="onlineText">-</strong></span>
+          </div>
+        </header>
+
+        <div class="lobby-hero">
+          <p class="eyebrow">群雄逐鹿 · 智定乾坤</p>
+          <h1>三国斗地主</h1>
+          <p>烽火连城，一局定胜负</p>
+        </div>
+
+        <section class="lobby-entry-panel">
+          <form id="connectForm" class="lobby-connect developer-only" aria-label="开发者服务器配置">
+            <label for="serverInput">服务器地址</label>
+            <input id="serverInput" type="text" value="ws://localhost:1780/ws" autocomplete="off" />
+            <button id="connectBtn" type="submit">连接服务器</button>
+          </form>
+
+          <div class="lobby-mode-grid">
+            <button class="mode-card taoyuan" data-action="quick_match"><strong>桃园初会</strong><span>快速匹配 · 初入战局</span></button>
+            <button class="mode-card guandu" data-action="quick_match"><strong>官渡争锋</strong><span>进阶匹配 · 运筹帷幄</span></button>
+            <button class="mode-card chibi" data-action="quick_match"><strong>赤壁鏖战</strong><span>高手匹配 · 烈火争锋</span></button>
+            <button class="mode-card qunxiong" data-action="quick_match"><strong>群雄逐鹿</strong><span>巅峰匹配 · 问鼎中原</span></button>
+          </div>
+
+          <div class="lobby-room-join">
+            <input id="roomInput" type="text" placeholder="请输入房间号" />
+            <button data-action="create_room">创建房间</button>
+            <button data-action="join_room">加入房间</button>
+          </div>
+
+          <div class="practice-difficulty">
+            <span>人机强度</span>
+            <select id="practiceDifficulty" aria-label="人机强度">
+              <option value="easy">新手</option>
+              <option value="normal" selected>普通</option>
+              <option value="hard">高手</option>
+            </select>
+            <small>选择后再点“人机练习”或“添加机器人”</small>
+          </div>
+
+          <div class="lobby-special-modes">
+            <button class="special-mode" data-action="practice_match"><span class="special-art" data-generated-asset="aiPracticeGeneral"></span><span><strong>人机练习</strong><small>与军师切磋牌技</small></span></button>
+            <button class="special-mode" id="joinModeFocus" type="button"><span class="special-art" data-generated-asset="friendBattleGeneral"></span><span><strong>好友对战</strong><small>创建或加入私人房间</small></span></button>
+          </div>
+
+          <nav class="lobby-bottom-nav" aria-label="大厅功能">
+            <button data-action="get_leaderboard"><span data-generated-asset="rank"></span><strong>排行榜</strong></button>
+            <button data-action="get_stats"><span data-generated-asset="record"></span><strong>战绩</strong></button>
+            <button type="button"><span data-generated-asset="shop"></span><strong>商城</strong></button>
+            <button type="button"><span data-generated-asset="task"></span><strong>每日任务</strong></button>
+            <button type="button"><span data-generated-asset="gift"></span><strong>签到奖励</strong></button>
+            <button type="button"><span data-generated-asset="settings"></span><strong>设置</strong></button>
+          </nav>
+
+          <div class="lobby-secondary">
+            <select id="skinSelect" aria-label="切换皮肤"></select>
+            <button id="bgmToggle" type="button" aria-pressed="false">BGM</button>
+          </div>
+        </section>
+
+        <aside class="announcement-board">
+          <h2>军情公告</h2>
+          <p>欢迎来到三国斗地主。</p>
+          <p>连接服务器后即可快速匹配或创建房间。</p>
+          <p>人机练习可离线进入牌桌。</p>
+        </aside>
+        <div id="listPanel" class="hidden-list-panel" aria-live="polite"></div>
+      </section>
+
+      <section id="gameView" class="app-view game-view" aria-label="正式游戏牌桌" hidden>
+        <header class="game-hud">
+          <button id="lobbyToggle" class="back-lobby" type="button">返回大厅</button>
+          <div class="game-room-meta">
+            <span class="yuanzi-balance game-yuanzi-balance">元子 <strong id="gameYuanziText">0</strong></span>
+            <span>房间号 <strong id="roomText">-</strong></span>
+            <span>当前回合 <strong id="roundText">等待开局</strong></span>
+            <span>倍数 <strong id="multiplierText">1x</strong></span>
+            <span id="landlordStatus">地主未确定</span>
+          <button id="counterToggle" class="hud-btn" type="button" title="记牌器">📊</button>
+          <button id="sfxToggle" class="hud-btn" type="button" title="音效">🔊</button>
+          </div>
+        </header>
+
+        <section class="battlefield" aria-label="现代卡牌游戏牌桌">
+          <div id="cardCounter" class="card-counter" style="display:none;"></div>
+          <div class="opponents-row">
+            <div id="seat1" class="seat opponent-card"></div>
+            <div id="seat1Played" class="opponent-play-slot opponent-play-left card-row compact"></div>
+            <div class="bottom-card-stage"><div class="stage-label">底牌</div><div class="bottom-cards" id="bottomCards"></div></div>
+            <div id="seat2" class="seat opponent-card"></div>
+            <div id="seat2Played" class="opponent-play-slot opponent-play-right card-row compact"></div>
+          </div>
+          <section class="played-stage">
+            <div id="turnBanner" class="turn-banner">等待玩家操作</div>
+            <div id="poetryLine" class="poetry-line">...</div>
+            <div id="lastPlayLabel" class="last-play-title">等待牌局</div>
+            <div id="lastPlayedCards" class="card-row compact"></div>
+            <div id="turnHint" class="turn-hint">当前出牌会显示在这里</div>
+          </section>
+          <section class="self-panel">
+            <div id="seat0" class="seat self-seat"></div>
+            <div class="hand-wrap">
+              <div id="handCards" class="card-row hand"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="bottom-command-bar">
+          <button type="button" class="hint-button">提示</button>
+          <button data-action="bid_yes">叫 / 抢地主</button>
+          <button data-action="bid_no">不叫 / 不抢</button>
+          <button data-action="pass">不出</button>
+          <button data-action="play_cards" class="primary-play">出牌</button>
+          <button data-action="trusteeship" class="trusteeship-button">托管</button>
+          <button data-action="ready">准备</button>
+          <label class="bot-difficulty-control" id="botDifficultyControl">
+            <span>人机</span>
+            <select id="botDifficulty" aria-label="添加机器人强度">
+              <option value="easy">新手</option>
+              <option value="normal" selected>普通</option>
+              <option value="hard">高手</option>
+            </select>
+          </label>
+          <button data-action="add_bot">添加机器人</button>
+          <button data-action="leave_room">离开</button>
+          <button data-action="replay" style="color:var(--gold);border-color:var(--gold);">再来一局</button>
+        </section>
+
+        <aside id="chatPanel" class="chat-drawer collapsed">
+          <button id="chatToggle" class="chat-toggle" type="button" aria-label="展开或收起聊天">聊</button>
+          <div class="drawer-inner">
+            <section class="parchment-panel chat-section">
+              <h2>聊天</h2>
+              <div id="log" class="log"></div>
+              <form id="chatForm" class="chat-form"><input id="chatInput" type="text" placeholder="输入聊天内容..." /><button type="submit">发送</button></form>
+            </section>
+          </div>
+        </aside>
+      </section>
+      <audio id="bgmAudio" src="./assets/audio/x-massage_shop.mp3" loop preload="auto"></audio>
+    </main>
+    <script src="./app.js?v=20260607-20"></script>
+  </body>
+</html>

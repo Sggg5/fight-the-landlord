@@ -44,6 +44,15 @@ var messageHandlers = map[protocol.MessageType]messageHandler{
 	// Stats
 	protocol.MsgStatsResult:       handleMsgStatsResult,
 	protocol.MsgLeaderboardResult: handleMsgLeaderboardResult,
+	// Sign-in & Achievements
+	protocol.MsgSignInResult:       handleMsgSignInResult,
+	protocol.MsgAchievementsResult: handleMsgAchievementsResult,
+	// Shop
+	protocol.MsgShopListResult:       handleMsgShopListResult,
+	protocol.MsgPurchaseItemResult:   handleMsgPurchaseItemResult,
+	// Daily Tasks
+	protocol.MsgDailyTasksResult:     handleMsgDailyTasksResult,
+	protocol.MsgClaimDailyTaskResult: handleMsgClaimDailyTaskResult,
 
 	// Chat & Maintenance
 	protocol.MsgChat:            handleMsgChat,

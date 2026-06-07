@@ -138,6 +138,7 @@ func LobbyView(m model.Model) string {
 		"[05] 排行榜",
 		"[06] 我的战绩",
 		"[07] 游戏规则",
+		"[08] 成就",
 	}
 
 	lobbyModel := m.Lobby()
@@ -346,4 +347,50 @@ func renderStatsTable(s *protocol.StatsResultPayload) string {
 	}
 
 	return common.BoxStyle.Render(sb.String())
+}// AchievementsView renders the achievements page.
+func AchievementsView(m model.Model) string {
+	var sb strings.Builder
+
+	title := common.TitleStyle("🏆 成就")
+	sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, title))
+	sb.WriteString("\n\n")
+
+	achievements := m.Lobby().Achievements()
+	if len(achievements) > 0 {
+		var list strings.Builder
+		list.WriteString(strings.Repeat("─", 50) + "\n")
+		for _, a := range achievements {
+			icon := "❌"
+			if a.Achieved {
+				icon = "✅"
+			}
+			progBar := progressBar(a.Progress, 20)
+			fmt.Fprintf(&list, "%s %s\n", icon, a.Name)
+			fmt.Fprintf(&list, "   %s\n", a.Description)
+			fmt.Fprintf(&list, "   %s %d%%\n", progBar, a.Progress)
+			list.WriteString(strings.Repeat("─", 50) + "\n")
+		}
+		achievementBox := common.BoxStyle.Render(list.String())
+		sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, achievementBox))
+	} else {
+		noData := "暂无成就数据\n\n玩家完成游戏后将自动解锁成就"
+		sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, noData))
+	}
+
+	sb.WriteString("\n\n")
+	hint := "按 ESC 返回大厅"
+	sb.WriteString(lipgloss.PlaceHorizontal(m.Width(), lipgloss.Center, hint))
+
+	return sb.String()
 }
+
+func progressBar(percent, width int) string {
+	filled := percent * width / 100
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	return bar
+}
+
+

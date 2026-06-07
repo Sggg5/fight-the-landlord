@@ -31,6 +31,11 @@ func (c *Client) QuickMatch() error {
 	return c.SendMessage(codec.MustNewMessage(protocol.MsgQuickMatch, nil))
 }
 
+// PracticeMatch 人机练习
+func (c *Client) PracticeMatch() error {
+	return c.SendMessage(codec.MustNewMessage(protocol.MsgPracticeMatch, nil))
+}
+
 // Ready 准备
 func (c *Client) Ready() error {
 	return c.SendMessage(codec.MustNewMessage(protocol.MsgReady, nil))

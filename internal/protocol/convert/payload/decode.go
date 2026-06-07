@@ -203,7 +203,7 @@ func decodeInfoMessages(msgType protocol.MessageType, data []byte, target any) (
 	case protocol.MsgStatsResult:
 		var pbMsg pb.StatsResultPayload
 		if err := proto.Unmarshal(data, &pbMsg); err != nil {
-			return true, err
+			return true, json.Unmarshal(data, target)
 		}
 		*target.(*protocol.StatsResultPayload) = protocol.StatsResultPayload{
 			PlayerID:      pbMsg.PlayerId,

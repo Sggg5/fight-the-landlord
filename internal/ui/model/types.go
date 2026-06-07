@@ -28,6 +28,7 @@ const (
 	PhaseGameOver
 	PhaseLeaderboard
 	PhaseStats
+	PhaseAchievements
 	PhaseRules
 )
 
@@ -35,20 +36,20 @@ const (
 type NotificationType int
 
 const (
-	NotifyError            NotificationType = iota // 错误信息（临时）
-	NotifyRateLimit                                // 限频提示（临时）
-	NotifyReconnecting                             // 重连中（持久）
-	NotifyReconnectSuccess                         // 重连成功（临时）
-	NotifyMaintenance                              // 维护通知（持久）
-	NotifyOnlineCount                              // 在线人数（持久）
-	NotifyInfo                                     // 一般信息提示（临时）
+	NotifyError            NotificationType = iota // éè¯¯ä¿¡æ¯ï¼ä¸´æ¶ï¼
+	NotifyRateLimit                                // éé¢æç¤ºï¼ä¸´æ¶ï¼
+	NotifyReconnecting                             // éè¿ä¸­ï¼æä¹ï¼?
+	NotifyReconnectSuccess                         // éè¿æåï¼ä¸´æ¶ï¼
+	NotifyMaintenance                              // ç»´æ¤éç¥ï¼æä¹ï¼
+	NotifyOnlineCount                              // å¨çº¿äººæ°ï¼æä¹ï¼
+	NotifyInfo                                     // ä¸è¬ä¿¡æ¯æç¤ºï¼ä¸´æ¶ï¼?
 )
 
 // SystemNotification represents a system notification.
 type SystemNotification struct {
 	Message   string
 	Type      NotificationType
-	Temporary bool // 是否为临时通知（3秒后自动消失）
+	Temporary bool // æ¯å¦ä¸ºä¸´æ¶éç¥ï¼?ç§åèªå¨æ¶å¤±ï¼?
 }
 
 // --- Tea Messages ---
@@ -158,6 +159,22 @@ type LobbyAccessor interface {
 	SetLeaderboard([]protocol.LeaderboardEntry)
 	MyStats() *protocol.StatsResultPayload
 	SetMyStats(*protocol.StatsResultPayload)
+
+	// Sign-in
+	SignInInfo() (consecutive int, canSignIn bool)
+	SetSignInInfo(consecutive int, canSignIn bool, coins int)
+
+	// Achievements
+	Achievements() []protocol.AchievementInfo
+	SetAchievements([]protocol.AchievementInfo)
+
+	// Shop
+	ShopItems() []protocol.ShopItem
+	SetShopItems([]protocol.ShopItem)
+
+	// Daily Tasks
+	DailyTasks() ([]protocol.DailyTaskInfo, int64)
+	SetDailyTasks([]protocol.DailyTaskInfo, int64)
 
 	// Chat
 	ChatHistory() []string

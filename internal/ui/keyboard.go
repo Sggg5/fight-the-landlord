@@ -29,7 +29,7 @@ func sendChatMessage(m model.Model, content, scope string) tea.Cmd {
 		Scope:   scope,
 	})
 	if err := m.Client().SendMessage(chatMsg); err != nil {
-		m.SetNotification(model.NotifyError, fmt.Sprintf("⚠️ 发送消息失败: %v", err), true)
+		m.SetNotification(model.NotifyError, fmt.Sprintf("â ï¸ åéæ¶æ¯å¤±è´? %v", err), true)
 		return clearSystemNotification()
 	}
 	return nil
@@ -219,7 +219,7 @@ func HandleKeyPress(m model.Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 	return false, nil
 }
 
-// playMenuFeedback 在大厅 / 房间列表用上下键导航或回车选择时给出按键音反馈
+// playMenuFeedback å¨å¤§å?/ æ¿é´åè¡¨ç¨ä¸ä¸é®å¯¼èªæåè½¦éæ©æ¶ç»åºæé®é³åé¦
 func playMenuFeedback(m model.Model) {
 	switch m.Phase() {
 	case model.PhaseLobby, model.PhaseRoomList:
@@ -234,7 +234,7 @@ func handleEscKey(m model.Model) (bool, tea.Cmd) {
 	}
 
 	switch m.Phase() {
-	case model.PhaseRoomList, model.PhaseMatching, model.PhaseLeaderboard, model.PhaseStats, model.PhaseRules, model.PhaseGameOver:
+	case model.PhaseRoomList, model.PhaseMatching, model.PhaseLeaderboard, model.PhaseStats, model.PhaseAchievements, model.PhaseRules, model.PhaseGameOver:
 		m.EnterLobby()
 		return true, nil
 	case model.PhaseWaiting:
@@ -242,7 +242,7 @@ func handleEscKey(m model.Model) (bool, tea.Cmd) {
 		m.EnterLobby()
 		return true, nil
 	case model.PhaseBidding, model.PhasePlaying:
-		m.SetNotification(model.NotifyError, "⚠️ 游戏进行中，无法退出！", true)
+		m.SetNotification(model.NotifyError, "â ï¸ æ¸¸æè¿è¡ä¸­ï¼æ æ³éåºï¼", true)
 		return true, clearSystemNotification()
 	}
 
@@ -256,12 +256,22 @@ func handleRuneKey(m model.Model, msg tea.KeyMsg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
+	if m.Phase() == model.PhaseGameOver && (runes[0] == 'r' || runes[0] == 'R') {
+		return true, handleGameOverPracticeRestart(m)
+	}
+
 	// Mute toggle works in any phase
+	if m.Phase() == model.PhaseLobby && (runes[0] == 's' || runes[0] == 'S') {
+		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgSignIn, nil))
+		m.SetNotification(model.NotifyInfo, "???...", true)
+		return true, clearSystemNotification()
+	}
+
 	if runes[0] == 'm' || runes[0] == 'M' {
 		if muted := m.ToggleMute(); muted {
-			m.SetNotification(model.NotifyInfo, "🔇 已静音", true)
+			m.SetNotification(model.NotifyInfo, "ð å·²éé?, true)
 		} else {
-			m.SetNotification(model.NotifyInfo, "🔊 声音已开启", true)
+			m.SetNotification(model.NotifyInfo, "ð å£°é³å·²å¼å?, true)
 		}
 		return true, clearSystemNotification()
 	}
@@ -303,28 +313,28 @@ func handleEnter(m model.Model) tea.Cmd {
 	return nil
 }
 
-// checkServerAvailability 检查服务器是否可用于游戏操作
-// 返回 true 和错误命令如果服务器不可用，返回 false 和 nil 如果可用
+// checkServerAvailability æ£æ¥æå¡å¨æ¯å¦å¯ç¨äºæ¸¸ææä½?
+// è¿å true åéè¯¯å½ä»¤å¦ææå¡å¨ä¸å¯ç¨ï¼è¿å false å?nil å¦æå¯ç¨
 func checkServerAvailability(m model.Model) (blocked bool, cmd tea.Cmd) {
 	if blocked, cmd := checkMaintenanceMode(m); blocked {
 		return blocked, cmd
 	}
 	if m.Client().IsReconnecting() {
-		m.SetNotification(model.NotifyError, "⚠️ 正在重连中，请稍后再试", true)
+		m.SetNotification(model.NotifyError, "â ï¸ æ­£å¨éè¿ä¸­ï¼è¯·ç¨ååè¯?, true)
 		return true, clearSystemNotification()
 	}
 	if !m.Client().IsConnected() {
-		m.SetNotification(model.NotifyError, "⚠️ 未连接到服务器", true)
+		m.SetNotification(model.NotifyError, "â ï¸ æªè¿æ¥å°æå¡å?, true)
 		return true, clearSystemNotification()
 	}
 	return false, nil
 }
 
-// checkMaintenanceMode 检查服务器是否处于维护模式
-// 返回 true 和错误命令如果在维护模式，返回 false 和 nil 如果正常
+// checkMaintenanceMode æ£æ¥æå¡å¨æ¯å¦å¤äºç»´æ¤æ¨¡å¼
+// è¿å true åéè¯¯å½ä»¤å¦æå¨ç»´æ¤æ¨¡å¼ï¼è¿å?false å?nil å¦ææ­£å¸¸
 func checkMaintenanceMode(m model.Model) (blocked bool, cmd tea.Cmd) {
 	if m.IsMaintenanceMode() {
-		m.SetNotification(model.NotifyError, "⚠️ 服务器维护中，暂停接受新连接", true)
+		m.SetNotification(model.NotifyError, "â ï¸ æå¡å¨ç»´æ¤ä¸­ï¼æåæ¥åæ°è¿æ¥", true)
 		return true, clearSystemNotification()
 	}
 	return false, nil
@@ -336,7 +346,7 @@ func handleLobbyEnter(m model.Model, input string) tea.Cmd {
 	}
 
 	switch input {
-	case "1": // 快速匹配
+	case "1": // å¿«éå¹é?
 		if blocked, cmd := checkServerAvailability(m); blocked {
 			return cmd
 		}
@@ -344,21 +354,21 @@ func handleLobbyEnter(m model.Model, input string) tea.Cmd {
 		m.SetMatchingStartTime(time.Now())
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgQuickMatch, nil))
 
-	case "2": // 创建房间
+	case "2": // åå»ºæ¿é´
 		if blocked, cmd := checkMaintenanceMode(m); blocked {
 			return cmd
 		}
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgCreateRoom, nil))
 
-	case "3": // 房间列表
+	case "3": // æ¿é´åè¡¨
 		if blocked, cmd := checkMaintenanceMode(m); blocked {
 			return cmd
 		}
 		m.SetPhase(model.PhaseRoomList)
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetRoomList, nil))
-		m.Input().Placeholder = "输入房间号或按 ESC 返回"
+		m.Input().Placeholder = "è¾å¥æ¿é´å·ææ?ESC è¿å"
 
-	case "4": // 人机练习
+	case "4": // äººæºç»ä¹ 
 		if blocked, cmd := checkServerAvailability(m); blocked {
 			return cmd
 		}
@@ -366,18 +376,23 @@ func handleLobbyEnter(m model.Model, input string) tea.Cmd {
 		m.SetMatchingStartTime(time.Now())
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgPracticeMatch, nil))
 
-	case "5": // 排行榜
+	case "5": // æè¡æ¦?
 		m.SetPhase(model.PhaseLeaderboard)
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetLeaderboard, nil))
 
-	case "6": // 统计信息
+	case "6": // ç»è®¡ä¿¡æ¯
 		m.SetPhase(model.PhaseStats)
 		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetStats, nil))
 
-	case "7": // 游戏规则
+	case "7": // æ¸¸æè§å
+	case "7": // ÓÎÏ·¹æÔò
 		m.SetPhase(model.PhaseRules)
 
-	default: // 加入房间
+	case "8": // ³É¾Í
+		m.SetPhase(model.PhaseAchievements)
+		_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetAchievements, nil))
+
+	default: // å å¥æ¿é´
 		if blocked, cmd := checkMaintenanceMode(m); blocked {
 			return cmd
 		}
@@ -391,7 +406,7 @@ func handleLobbyEnter(m model.Model, input string) tea.Cmd {
 
 func handleRoomListEnter(m model.Model, input string) tea.Cmd {
 	if m.IsMaintenanceMode() {
-		m.SetNotification(model.NotifyError, "⚠️ 服务器维护中，暂停加入房间", true)
+		m.SetNotification(model.NotifyError, "â ï¸ æå¡å¨ç»´æ¤ä¸­ï¼æåå å¥æ¿é?, true)
 		return clearSystemNotification()
 	}
 	rooms := m.Lobby().AvailableRooms()
@@ -451,4 +466,29 @@ func handleGameOverEnter(m model.Model) tea.Cmd {
 	_ = m.Client().SendMessage(codec.MustNewMessage(protocol.MsgGetMaintenanceStatus, nil))
 
 	return nil
+}
+
+func handleGameOverPracticeRestart(m model.Model) tea.Cmd {
+	if !gameHadBot(m) {
+		return nil
+	}
+	if blocked, cmd := checkServerAvailability(m); blocked {
+		return cmd
+	}
+
+	m.Game().State().Reset()
+	m.SetPhase(model.PhaseMatching)
+	m.SetMatchingStartTime(time.Now())
+	_ = m.Client().PracticeMatch()
+
+	return nil
+}
+
+func gameHadBot(m model.Model) bool {
+	for _, player := range m.Game().State().Players {
+		if player.IsBot {
+			return true
+		}
+	}
+	return false
 }

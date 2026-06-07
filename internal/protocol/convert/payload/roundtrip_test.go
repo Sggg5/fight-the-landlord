@@ -514,6 +514,9 @@ func TestPayloadRoundTrip_StatsAndLeaderboard(t *testing.T) {
 			FarmerGames:   50,
 			FarmerWins:    30,
 			Score:         1000,
+			Coins:         1280,
+			LastCoinChange: 80,
+			BankruptcyGrants: 1,
 			Rank:          5,
 			CurrentStreak: 3,
 			MaxWinStreak:  10,
@@ -529,6 +532,9 @@ func TestPayloadRoundTrip_StatsAndLeaderboard(t *testing.T) {
 		assert.Equal(t, original.TotalGames, result.TotalGames)
 		assert.Equal(t, original.WinRate, result.WinRate)
 		assert.Equal(t, original.Score, result.Score)
+		assert.Equal(t, original.Coins, result.Coins)
+		assert.Equal(t, original.LastCoinChange, result.LastCoinChange)
+		assert.Equal(t, original.BankruptcyGrants, result.BankruptcyGrants)
 	})
 
 	t.Run("LeaderboardResult", func(t *testing.T) {

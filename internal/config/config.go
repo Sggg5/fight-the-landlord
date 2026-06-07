@@ -51,6 +51,7 @@ type BotConfig struct {
 	// DouZero 引擎配置；未启用时使用内置规则启发式机器人
 	DouZeroEnabled bool   `yaml:"douzero_enabled"` // 使用 DouZero 神经网络引擎
 	DouZeroURL     string `yaml:"douzero_url"`     // Python 服务地址
+	Difficulty     string `yaml:"difficulty"`      // easy/normal/hard
 }
 
 // ServerConfig WebSocket 服务器配置
@@ -217,6 +218,7 @@ func loadFromEnv(cfg *Config) {
 		cfg.BOT.Enabled = true
 	}
 	getEnvInt("BOT_FILL_TIMEOUT", &cfg.BOT.BotFillTimeout)
+	getEnvStr("BOT_DIFFICULTY", &cfg.BOT.Difficulty)
 	if v := os.Getenv("DOUZERO_ENABLED"); v == "true" || v == "1" {
 		cfg.BOT.DouZeroEnabled = true
 	}
@@ -279,6 +281,7 @@ func setDefaults(cfg *Config) {
 
 	// Bot
 	setDefaultInt(&cfg.BOT.BotFillTimeout, 30)
+	setDefaultStr(&cfg.BOT.Difficulty, "normal")
 	setDefaultStr(&cfg.BOT.DouZeroURL, "http://localhost:2021")
 }
 

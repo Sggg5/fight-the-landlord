@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"os"
 
 	"github.com/palemoky/fight-the-landlord/internal/protocol"
 	"github.com/palemoky/fight-the-landlord/internal/protocol/codec"
@@ -17,6 +18,32 @@ func sendGameError(client types.ClientInterface, err error) {
 	} else {
 		client.SendMessage(codec.NewErrorMessageWithText(protocol.ErrCodeUnknown, err.Error()))
 	}
+}
+
+func (h *Handler) handleHint(client types.ClientInterface) {
+	if h.roomManager == nil {
+		client.SendMessage(codec.NewErrorMessage(protocol.ErrCodeGameNotStart))
+		return
+	}
+	room := h.roomManager.GetRoom(client.GetRoom())
+	if room == nil {
+		client.SendMessage(codec.NewErrorMessage(protocol.ErrCodeNotInRoom))
+		return
+	}
+	gameSession := h.GetGameSession(room.Code)
+	if gameSession == nil {
+		client.SendMessage(codec.NewErrorMessage(protocol.ErrCodeGameNotStart))
+		return
+	}
+	douzeroURL := os.Getenv("DOUZERO_URL")
+	if douzeroURL == "" {
+		douzeroURL = "http://localhost:2021"
+	}
+	cards, message := gameSession.SuggestPlay(client.GetID(), douzeroURL)
+	client.SendMessage(codec.MustNewMessage(protocol.MsgHintResult, protocol.HintResultPayload{
+		Cards:   cards,
+		Message: message,
+	}))
 }
 
 // handleBid 处理叫地主

@@ -202,6 +202,30 @@ func (rm *RoomManager) SetPlayerReady(client types.ClientInterface, ready bool) 
 	return nil
 }
 
+// RestartRoom starts another round in an ended room and recreates the game session.
+func (rm *RoomManager) RestartRoom(client types.ClientInterface) error {
+	roomCode := client.GetRoom()
+	if roomCode == "" {
+		return apperrors.ErrNotInRoom
+	}
+
+	rm.mu.RLock()
+	room, exists := rm.rooms[roomCode]
+	rm.mu.RUnlock()
+	if !exists {
+		return apperrors.ErrRoomNotFound
+	}
+
+	if err := room.RestartGame(); err != nil {
+		return err
+	}
+
+	if rm.onGameStart != nil {
+		rm.onGameStart(room)
+	}
+	return nil
+}
+
 func (rm *RoomManager) SetOnGameStart(callback func(*Room)) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()

@@ -18,9 +18,20 @@ cover.out
 bin/*
 /client
 /server
+/server.exe
+*.exe
+*.exe~
+*.log
+*.bak
+fix_*.py
+gen_*.py
+test_ws*.py
+test_final.py
+helper.json
 /coverage.out
 
 # DouZero
 .venv/
 __pycache__/
 models/
+douzero/*.log

@@ -34,6 +34,8 @@ func CreateViewRenderer() func(model.Model, model.GamePhase) string {
 			return LeaderboardView(m)
 		case model.PhaseStats:
 			return StatsView(m)
+		case model.PhaseAchievements:
+			return AchievementsView(m)
 		case model.PhaseRules:
 			return RulesView(m.Width(), m.Height())
 		default:
@@ -159,11 +161,14 @@ func GameOverView(m model.Model) string {
 	}
 
 	winnerName := state.Winner
+	hasBot := false
 	// Find winner name from players
 	for _, p := range state.Players {
 		if p.ID == state.Winner {
 			winnerName = p.Name
-			break
+		}
+		if p.IsBot {
+			hasBot = true
 		}
 	}
 
@@ -183,6 +188,10 @@ func GameOverView(m model.Model) string {
 		}
 	}
 	sb.WriteString("\n按 ESC 返回大厅")
+
+	if hasBot {
+		sb.WriteString("\n按 R 再来一局人机")
+	}
 
 	content := lipgloss.NewStyle().
 		Width(width).

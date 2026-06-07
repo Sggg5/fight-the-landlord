@@ -60,6 +60,7 @@ bot:
   enabled: true
   # 玩家等待多少秒后由机器人填充剩余座位
   bot_fill_timeout: 15
+  difficulty: "normal"
 
   # --- DouZero 引擎 ---
   # 启用后使用 DouZero 神经网络引擎；关闭时使用内置规则启发式机器人（无外部依赖）

@@ -103,6 +103,32 @@ func TestLeaderboard_StreakBonus(t *testing.T) {
 	assert.Equal(t, 3, stats.CurrentStreak)
 }
 
+func TestLeaderboard_Economy(t *testing.T) {
+	t.Parallel()
+
+	lm, mr := newTestLeaderboardManager(t)
+	defer mr.Close()
+	ctx := context.Background()
+
+	err := lm.RecordGameResultWithScore(ctx, "p1", "Player1", true, true, 8)
+	assert.NoError(t, err)
+
+	stats, err := lm.GetPlayerStats(ctx, "p1")
+	assert.NoError(t, err)
+	assert.Equal(t, InitialCoins+8*BaseStake, stats.Coins)
+	assert.Equal(t, 8*BaseStake, stats.LastCoinChange)
+	assert.Equal(t, 0, stats.BankruptcyGrants)
+
+	err = lm.RecordGameResultWithScore(ctx, "p2", "Player2", true, false, -200)
+	assert.NoError(t, err)
+
+	stats, err = lm.GetPlayerStats(ctx, "p2")
+	assert.NoError(t, err)
+	assert.Equal(t, BankruptcySubsidy, stats.Coins)
+	assert.Equal(t, -200*BaseStake, stats.LastCoinChange)
+	assert.Equal(t, 1, stats.BankruptcyGrants)
+}
+
 func TestLeaderboard_GetLeaderboard(t *testing.T) {
 	t.Parallel()
 

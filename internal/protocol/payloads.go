@@ -28,6 +28,11 @@ type PlayCardsPayload struct {
 	Cards []CardInfo `json:"cards"`
 }
 
+type HintResultPayload struct {
+	Cards   []CardInfo `json:"cards"`
+	Message string     `json:"message,omitempty"`
+}
+
 // GetLeaderboardPayload 获取排行榜请求
 type GetLeaderboardPayload struct {
 	Type   string `json:"type"`   // total/daily/weekly
@@ -221,20 +226,46 @@ type ErrorPayload struct {
 
 // StatsResultPayload 个人统计结果
 type StatsResultPayload struct {
-	PlayerID      string  `json:"player_id"`
-	PlayerName    string  `json:"player_name"`
-	TotalGames    int     `json:"total_games"`
-	Wins          int     `json:"wins"`
-	Losses        int     `json:"losses"`
-	WinRate       float64 `json:"win_rate"`
-	LandlordGames int     `json:"landlord_games"`
-	LandlordWins  int     `json:"landlord_wins"`
-	FarmerGames   int     `json:"farmer_games"`
-	FarmerWins    int     `json:"farmer_wins"`
-	Score         int     `json:"score"`
-	Rank          int     `json:"rank"`
-	CurrentStreak int     `json:"current_streak"`
-	MaxWinStreak  int     `json:"max_win_streak"`
+	PlayerID         string  `json:"player_id"`
+	PlayerName       string  `json:"player_name"`
+	TotalGames       int     `json:"total_games"`
+	Wins             int     `json:"wins"`
+	Losses           int     `json:"losses"`
+	WinRate          float64 `json:"win_rate"`
+	LandlordGames    int     `json:"landlord_games"`
+	LandlordWins     int     `json:"landlord_wins"`
+	FarmerGames      int     `json:"farmer_games"`
+	FarmerWins       int     `json:"farmer_wins"`
+	Score            int     `json:"score"`
+	Coins            int     `json:"coins"`
+	LastCoinChange   int     `json:"last_coin_change"`
+	BankruptcyGrants int     `json:"bankruptcy_grants"`
+	Rank             int     `json:"rank"`
+	CurrentStreak    int     `json:"current_streak"`
+	MaxWinStreak     int     `json:"max_win_streak"`
+}
+
+// SignInResultPayload ????
+type SignInResultPayload struct {
+	SignedIn        bool `json:"signed_in"`        // ????????
+	Reward          int  `json:"reward"`           // ????????
+	ConsecutiveDays int  `json:"consecutive_days"` // ??????
+	Coins           int  `json:"coins"`            // ??????
+	CanSignIn       bool `json:"can_sign_in"`      // ???????
+}
+
+// AchievementInfo ????
+type AchievementInfo struct {
+	ID          string `json:"id"`          // ??ID
+	Name        string `json:"name"`        // ????
+	Description string `json:"description"` // ??
+	Achieved    bool   `json:"achieved"`    // ?????
+	Progress    int    `json:"progress"`    // ???? (0-100)
+}
+
+// AchievementsResultPayload ??????
+type AchievementsResultPayload struct {
+	Achievements []AchievementInfo `json:"achievements"`
 }
 
 // LeaderboardResultPayload 排行榜结果
@@ -273,6 +304,71 @@ type ChatPayload struct {
 	Scope      string `json:"scope"`                 // "lobby" or "room"
 	Time       int64  `json:"time,omitempty"`        // 发送时间 (服务端填充)
 	IsSystem   bool   `json:"is_system,omitempty"`   // 是否是系统消息
+}
+
+// --- 商城 ---
+
+// ShopItem 商城物品
+type ShopItem struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"` // card_back, avatar, title
+	Price       int    `json:"price"`
+}
+
+// ShopListResultPayload 商城物品列表结果
+type ShopListResultPayload struct {
+	Items []ShopItem `json:"items"`
+}
+
+// PurchaseItemPayload 购买物品请求
+type PurchaseItemPayload struct {
+	ItemID string `json:"item_id"`
+}
+
+// PurchaseItemResultPayload 购买结果
+type PurchaseItemResultPayload struct {
+	Success bool   `json:"success"`
+	ItemID  string `json:"item_id"`
+	Coins   int    `json:"coins"`
+	Error   string `json:"error,omitempty"`
+}
+
+// --- 每日任务 ---
+
+// DailyTaskInfo 每日任务信息
+type DailyTaskInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Requirement int    `json:"requirement"`
+	Progress    int    `json:"progress"`
+	Completed   bool   `json:"completed"`
+	Claimed     bool   `json:"claimed"`
+	RewardCoins int    `json:"reward_coins"`
+	RewardScore int    `json:"reward_score"`
+}
+
+// DailyTasksResultPayload 每日任务列表结果
+type DailyTasksResultPayload struct {
+	Tasks     []DailyTaskInfo `json:"tasks"`
+	NextReset int64           `json:"next_reset"`
+}
+
+// ClaimDailyTaskPayload 领取任务奖励请求
+type ClaimDailyTaskPayload struct {
+	TaskID string `json:"task_id"`
+}
+
+// ClaimDailyTaskResultPayload 领取奖励结果
+type ClaimDailyTaskResultPayload struct {
+	Success     bool   `json:"success"`
+	TaskID      string `json:"task_id"`
+	RewardCoins int    `json:"reward_coins"`
+	RewardScore int    `json:"reward_score"`
+	Coins       int    `json:"coins"`
+	Error       string `json:"error,omitempty"`
 }
 
 // --- 通用数据结构 ---

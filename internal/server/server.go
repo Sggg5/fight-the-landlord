@@ -113,7 +113,24 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// 初始化机器人 (未启用时为 nil）
 	var botEngine bot.DecisionEngine
 	if cfg.BOT.Enabled {
-		if cfg.BOT.DouZeroEnabled {
+		if true {
+			switch cfg.BOT.Difficulty {
+			case "hard":
+				botEngine = bot.NewDouZeroEngine(cfg.BOT.DouZeroURL)
+				log.Printf("DouZero hard bot enabled: %s", cfg.BOT.DouZeroURL)
+			case "normal", "":
+				if cfg.BOT.DouZeroEnabled {
+					botEngine = bot.NewBalancedEngine(bot.NewDouZeroEngine(cfg.BOT.DouZeroURL), 35)
+					log.Printf("Balanced normal bot enabled: DouZero chance 35%%, url=%s", cfg.BOT.DouZeroURL)
+				} else {
+					botEngine = bot.NewHeuristicEngine()
+					log.Printf("Heuristic easy bot enabled")
+				}
+			default:
+				botEngine = bot.NewHeuristicEngine()
+				log.Printf("Heuristic easy bot enabled")
+			}
+		} else if cfg.BOT.DouZeroEnabled {
 			botEngine = bot.NewDouZeroEngine(cfg.BOT.DouZeroURL)
 			log.Printf("🎮 DouZero 引擎已启用（服务地址: %s，等待超时: %ds）", cfg.BOT.DouZeroURL, cfg.BOT.BotFillTimeout)
 		} else {
@@ -148,6 +165,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// 设置房间游戏开始回调
 	s.roomManager.SetOnGameStart(func(r *room.Room) {
 		gs := session.NewGameSession(r, s.leaderboard, s.config.Game)
+		for _, player := range r.Players {
+			if player != nil && player.Client != nil {
+				if botClient, ok := player.Client.(*bot.BotClient); ok {
+					botClient.SetSession(gs)
+				}
+			}
+		}
 		s.handler.SetGameSession(r.Code, gs)
 		gs.Start()
 	})

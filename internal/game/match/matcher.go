@@ -2,6 +2,7 @@ package match
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -218,13 +219,105 @@ func (m *Matcher) createMatchRoom(players []types.ClientInterface) {
 
 // PracticeMatch 人机练习：立即为玩家创建含 2 个机器人的房间
 func (m *Matcher) PracticeMatch(client types.ClientInterface) {
-	engine := m.botEngine
-	if engine == nil {
-		engine = bot.NewHeuristicEngine()
+	m.PracticeMatchWithDifficulty(client, "")
+}
+
+func (m *Matcher) PracticeMatchWithDifficulty(client types.ClientInterface, difficulty string) {
+	if m.restartPracticeRoom(client) {
+		return
 	}
+	if client.GetRoom() != "" {
+		m.roomManager.LeaveRoom(client)
+	}
+
+	engine := m.botEngineForDifficulty(difficulty)
 	bot1 := bot.NewBotClient(engine)
 	bot2 := bot.NewBotClient(engine)
 	go m.createMatchRoom([]types.ClientInterface{client, bot1, bot2})
+}
+
+// AddBotToRoom adds one ready bot to the client's waiting room.
+func (m *Matcher) AddBotToRoom(client types.ClientInterface) error {
+	return m.AddBotToRoomWithDifficulty(client, "")
+}
+
+func (m *Matcher) AddBotToRoomWithDifficulty(client types.ClientInterface, difficulty string) error {
+	roomCode := client.GetRoom()
+	if roomCode == "" {
+		return errors.New("player is not in a room")
+	}
+	r := m.roomManager.GetRoom(roomCode)
+	if r == nil {
+		return errors.New("room not found")
+	}
+
+	engine := m.botEngineForDifficulty(difficulty)
+	botClient := bot.NewBotClient(engine)
+	if _, err := m.roomManager.JoinRoom(botClient, roomCode); err != nil {
+		return err
+	}
+	if err := m.roomManager.SetPlayerReady(botClient, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Matcher) botEngineForDifficulty(difficulty string) bot.DecisionEngine {
+	switch difficulty {
+	case "easy":
+		return bot.NewHeuristicEngine()
+	case "hard":
+		strong := bot.NewStrongHeuristicEngine()
+		if m.botCfg.DouZeroEnabled {
+			return bot.NewDouZeroEngineWithFallback(m.botCfg.DouZeroURL, strong)
+		}
+		return strong
+	case "normal", "":
+		if m.botCfg.DouZeroEnabled {
+			return bot.NewBalancedEngine(bot.NewDouZeroEngine(m.botCfg.DouZeroURL), 35)
+		}
+		return m.botEngineOrDefault()
+	default:
+		return m.botEngineOrDefault()
+	}
+}
+
+func (m *Matcher) botEngineOrDefault() bot.DecisionEngine {
+	if m.botEngine != nil {
+		return m.botEngine
+	}
+	return bot.NewHeuristicEngine()
+}
+
+func (m *Matcher) restartPracticeRoom(client types.ClientInterface) bool {
+	roomCode := client.GetRoom()
+	if roomCode == "" {
+		return false
+	}
+	r := m.roomManager.GetRoom(roomCode)
+	if r == nil || !r.HasBot() {
+		return false
+	}
+	if err := r.RestartGame(); err != nil {
+		return false
+	}
+
+	gs := session.NewGameSession(r, m.leaderboard, m.gameConfig)
+	for _, roomClient := range r.GetClients() {
+		if botClient, ok := roomClient.(*bot.BotClient); ok {
+			botClient.SetSession(gs)
+		}
+	}
+	if m.registerSession != nil {
+		m.registerSession(r.Code, gs)
+	}
+	gs.Start()
+
+	if m.redisStore != nil && m.redisStore.IsReady() {
+		go func() { _ = m.redisStore.SaveRoom(context.Background(), r.Code, r.ToRoomData()) }()
+	}
+	log.Printf("人机房间 %s 已在原房间开始下一局", r.Code)
+	return true
 }
 
 // GetQueueLength 获取队列长度

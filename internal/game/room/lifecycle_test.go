@@ -273,3 +273,40 @@ func TestSetAllPlayersReady(t *testing.T) {
 	}
 	room.mu.RUnlock()
 }
+
+func TestRestartGame_KeepsPlayersAndStartsNewRound(t *testing.T) {
+	t.Parallel()
+
+	client1 := testutil.NewSimpleClient("p1", "Player1")
+	client2 := testutil.NewSimpleClient("p2", "Player2")
+	client3 := testutil.NewSimpleClient("p3", "Player3")
+	r := NewMockRoom("TEST123", client1)
+	r.Players["p2"] = &RoomPlayer{Client: client2, Seat: 1, IsLandlord: true}
+	r.Players["p3"] = &RoomPlayer{Client: client3, Seat: 2}
+	r.PlayerOrder = []string{"p1", "p2", "p3"}
+	r.State = RoomStateEnded
+
+	require.NoError(t, r.RestartGame())
+
+	assert.Equal(t, RoomStateReady, r.State)
+	assert.Equal(t, []string{"p1", "p2", "p3"}, r.PlayerOrder)
+	for _, player := range r.Players {
+		assert.True(t, player.Ready)
+		assert.False(t, player.IsLandlord)
+	}
+	assert.NotEmpty(t, client1.SentMessages())
+	assert.NotEmpty(t, client2.SentMessages())
+	assert.NotEmpty(t, client3.SentMessages())
+}
+
+func TestRestartGame_RejectsActiveRoom(t *testing.T) {
+	t.Parallel()
+
+	r := NewMockRoom("TEST123", testutil.NewSimpleClient("p1", "Player1"))
+	r.Players["p2"] = &RoomPlayer{Client: testutil.NewSimpleClient("p2", "Player2"), Seat: 1}
+	r.Players["p3"] = &RoomPlayer{Client: testutil.NewSimpleClient("p3", "Player3"), Seat: 2}
+	r.PlayerOrder = []string{"p1", "p2", "p3"}
+	r.State = RoomStatePlaying
+
+	assert.Error(t, r.RestartGame())
+}

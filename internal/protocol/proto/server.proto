@@ -79,6 +79,9 @@ message StatsResultPayload {
   int64 rank = 12;
   int64 current_streak = 13;
   int64 max_win_streak = 14;
+  int64 coins = 15;
+  int64 last_coin_change = 16;
+  int64 bankruptcy_grants = 17;
 }
 
 // LeaderboardResultPayload 排行榜结果

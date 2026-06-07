@@ -84,14 +84,16 @@ func (h *Handler) initHandlers() {
 		protocol.MsgJoinRoom:      h.handleJoinRoom,
 		protocol.MsgLeaveRoom:     func(c types.ClientInterface, _ *protocol.Message) { h.handleLeaveRoom(c) },
 		protocol.MsgQuickMatch:    func(c types.ClientInterface, _ *protocol.Message) { h.handleQuickMatch(c) },
-		protocol.MsgPracticeMatch: func(c types.ClientInterface, _ *protocol.Message) { h.handlePracticeMatch(c) },
+		protocol.MsgPracticeMatch: h.handlePracticeMatch,
 		protocol.MsgReady:         func(c types.ClientInterface, _ *protocol.Message) { h.handleReady(c, true) },
 		protocol.MsgCancelReady:   func(c types.ClientInterface, _ *protocol.Message) { h.handleReady(c, false) },
+		protocol.MsgReplay:        func(c types.ClientInterface, _ *protocol.Message) { h.handleReplay(c) },
 
 		// 游戏操作
 		protocol.MsgBid:       h.handleBid,
 		protocol.MsgPlayCards: h.handlePlayCards,
 		protocol.MsgPass:      func(c types.ClientInterface, _ *protocol.Message) { h.handlePass(c) },
+		protocol.MsgHint:      func(c types.ClientInterface, _ *protocol.Message) { h.handleHint(c) },
 
 		// 信息查询
 		protocol.MsgGetStats:             func(c types.ClientInterface, _ *protocol.Message) { h.handleGetStats(c) },
@@ -100,6 +102,18 @@ func (h *Handler) initHandlers() {
 		protocol.MsgGetOnlineCount:       func(c types.ClientInterface, _ *protocol.Message) { h.handleGetOnlineCount(c) },
 		protocol.MsgGetMaintenanceStatus: func(c types.ClientInterface, _ *protocol.Message) { h.handleGetMaintenanceStatus(c) },
 		protocol.MsgChat:                 h.handleChat,
+
+		// ?????
+		protocol.MsgSignIn:          func(c types.ClientInterface, _ *protocol.Message) { h.handleSignIn(c) },
+		protocol.MsgGetAchievements: func(c types.ClientInterface, _ *protocol.Message) { h.handleGetAchievements(c) },
+
+		// 商城
+		protocol.MsgShopList:     func(c types.ClientInterface, _ *protocol.Message) { h.handleShopList(c) },
+		protocol.MsgPurchaseItem: h.handlePurchaseItem,
+
+		// 每日任务
+		protocol.MsgGetDailyTasks:  func(c types.ClientInterface, _ *protocol.Message) { h.handleGetDailyTasks(c) },
+		protocol.MsgClaimDailyTask: h.handleClaimDailyTask,
 	}
 }
 

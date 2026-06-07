@@ -55,6 +55,7 @@ type GameSession struct {
 	bombCount     int // 已打出的炸弹+王炸数量，每个翻一倍
 	landlordPlays int // 地主实际出牌次数（用于反春天判断）
 	farmerPlays   int // 农民实际出牌次数（用于春天判断）
+	trusteeship   map[string]bool
 
 	// 出牌相关
 	currentPlayer     int             // 当前出牌玩家索引
@@ -78,10 +79,17 @@ func NewGameSession(r *room.Room, lb *storage.LeaderboardManager, gameCfg config
 	players := make([]*GamePlayer, len(playerOrder))
 	for i, id := range playerOrder {
 		rp := r.Players[id]
+		playerName := id
+		isOffline := true
+		if rp != nil && rp.Client != nil {
+			playerName = rp.Client.GetName()
+			isOffline = false
+		}
 		players[i] = &GamePlayer{
-			ID:   id,
-			Name: rp.Client.GetName(),
-			Seat: i,
+			ID:        id,
+			Name:      playerName,
+			Seat:      i,
+			IsOffline: isOffline,
 		}
 	}
 
@@ -94,5 +102,6 @@ func NewGameSession(r *room.Room, lb *storage.LeaderboardManager, gameCfg config
 		landlordCaller:    -1,
 		landlordCandidate: -1,
 		bidMultiplier:     1,
+		trusteeship:       make(map[string]bool),
 	}
 }

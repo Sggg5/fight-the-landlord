@@ -43,7 +43,7 @@ type LobbyModel struct {
 // NewLobbyModel creates a new LobbyModel.
 func NewLobbyModel(c *transport.Client, input *textinput.Model) *LobbyModel {
 	chatInput := textinput.New()
-	chatInput.Placeholder = "ENTER 输入聊天 / ↑↓ 选择菜单"
+	chatInput.Placeholder = "ENTER è¾å¥èå¤© / ââ éæ©èå"
 	chatInput.CharLimit = 50
 	chatInput.SetWidth(chatInputWidth)
 
@@ -91,8 +91,8 @@ func (m *LobbyModel) AddChatMessage(msg string) {
 }
 func (m *LobbyModel) ChatInput() *textinput.Model { return &m.chatInput }
 
-// HandleNavigationKey 处理上下键导航
-// direction: -1 表示向上，1 表示向下
+// HandleNavigationKey å¤çä¸ä¸é®å¯¼è?
+// direction: -1 è¡¨ç¤ºåä¸ï¼? è¡¨ç¤ºåä¸
 func (m *LobbyModel) HandleNavigationKey(phase GamePhase, direction int) {
 	switch phase {
 	case PhaseRoomList:
@@ -108,18 +108,18 @@ func (m *LobbyModel) HandleNavigationKey(phase GamePhase, direction int) {
 		m.selectedIndex += direction
 		if m.selectedIndex < 0 {
 			m.selectedIndex = 6
-		} else if m.selectedIndex > 6 {
+		} else if m.selectedIndex > 7 {
 			m.selectedIndex = 0
 		}
 	}
 }
 
-// HandleUpKey 处理向上键
+// HandleUpKey å¤çåä¸é?
 func (m *LobbyModel) HandleUpKey(phase GamePhase) {
 	m.HandleNavigationKey(phase, -1)
 }
 
-// HandleDownKey 处理向下键
+// HandleDownKey å¤çåä¸é?
 func (m *LobbyModel) HandleDownKey(phase GamePhase) {
 	m.HandleNavigationKey(phase, 1)
 }
@@ -134,3 +134,27 @@ func (m *LobbyModel) Input() *textinput.Model   { return m.input }
 func (m *LobbyModel) SelectedIndex() int        { return m.selectedIndex }
 func (m *LobbyModel) SetSelectedIndex(idx int)  { m.selectedIndex = idx }
 func (m *LobbyModel) Client() *transport.Client { return m.client }
+
+
+// --- Sign-in ---
+func (m *LobbyModel) SignInInfo() (int, bool) { return m.signInConsecutive, m.signInCanSignIn }
+func (m *LobbyModel) SetSignInInfo(consecutive int, canSignIn bool, coins int) {
+	m.signInConsecutive = consecutive
+	m.signInCanSignIn = canSignIn
+}
+
+// --- Achievements ---
+func (m *LobbyModel) Achievements() []protocol.AchievementInfo { return m.achievements }
+func (m *LobbyModel) SetAchievements(a []protocol.AchievementInfo) { m.achievements = a }
+
+// --- Shop ---
+func (m *LobbyModel) ShopItems() []protocol.ShopItem { return m.shopItems }
+func (m *LobbyModel) SetShopItems(items []protocol.ShopItem) { m.shopItems = items }
+
+// --- Daily Tasks ---
+func (m *LobbyModel) DailyTasks() ([]protocol.DailyTaskInfo, int64) { return m.dailyTasks, m.dailyTasksReset }
+func (m *LobbyModel) SetDailyTasks(tasks []protocol.DailyTaskInfo, reset int64) {
+	m.dailyTasks = tasks
+	m.dailyTasksReset = reset
+}
+

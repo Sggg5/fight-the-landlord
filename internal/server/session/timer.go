@@ -4,12 +4,93 @@ import (
 	"log"
 	"time"
 
+	"github.com/palemoky/fight-the-landlord/internal/game/card"
 	"github.com/palemoky/fight-the-landlord/internal/game/rule"
 	"github.com/palemoky/fight-the-landlord/internal/protocol"
 	"github.com/palemoky/fight-the-landlord/internal/protocol/convert"
 )
 
 // --- 超时控制 ---
+
+const trusteeshipDelay = 650 * time.Millisecond
+
+// SetTrusteeship enables or disables automatic actions for a player in an active game.
+func (gs *GameSession) SetTrusteeship(playerID string, enabled bool) bool {
+	gs.mu.Lock()
+	if gs.state != GameStateBidding && gs.state != GameStatePlaying {
+		gs.mu.Unlock()
+		return false
+	}
+	found := false
+	for _, player := range gs.players {
+		if player.ID == playerID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		gs.mu.Unlock()
+		return false
+	}
+	gs.trusteeship[playerID] = enabled
+	isTurn := (gs.state == GameStateBidding && gs.players[gs.currentBidder].ID == playerID) ||
+		(gs.state == GameStatePlaying && gs.players[gs.currentPlayer].ID == playerID)
+	gs.mu.Unlock()
+	if enabled && isTurn {
+		gs.scheduleTrusteeship(playerID)
+	}
+	return true
+}
+
+func (gs *GameSession) scheduleTrusteeship(playerID string) {
+	time.AfterFunc(trusteeshipDelay, func() {
+		gs.mu.RLock()
+		enabled := gs.trusteeship[playerID]
+		state := gs.state
+		isBidTurn := state == GameStateBidding && gs.players[gs.currentBidder].ID == playerID
+		isPlayTurn := state == GameStatePlaying && gs.players[gs.currentPlayer].ID == playerID
+		var hand []card.Card
+		if isBidTurn {
+			hand = append(hand, gs.players[gs.currentBidder].Hand...)
+		}
+		gs.mu.RUnlock()
+
+		if !enabled {
+			return
+		}
+		if isBidTurn {
+			_ = gs.HandleBid(playerID, shouldTrusteeshipBid(hand))
+			return
+		}
+		if isPlayTurn {
+			gs.handlePlayTimeout()
+		}
+	})
+}
+
+func shouldTrusteeshipBid(hand []card.Card) bool {
+	score := 0
+	counts := make(map[card.Rank]int)
+	for _, c := range hand {
+		counts[c.Rank]++
+		switch c.Rank {
+		case card.RankRedJoker:
+			score += 4
+		case card.RankBlackJoker:
+			score += 3
+		case card.Rank2:
+			score += 2
+		case card.RankA:
+			score++
+		}
+	}
+	for _, count := range counts {
+		if count == 4 {
+			score += 5
+		}
+	}
+	return score >= 8
+}
 
 func (gs *GameSession) startBidTimer() {
 	gs.timerMu.Lock()

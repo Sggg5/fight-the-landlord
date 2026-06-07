@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/palemoky/fight-the-landlord/internal/protocol"
@@ -8,7 +9,12 @@ import (
 	"github.com/palemoky/fight-the-landlord/internal/types"
 
 	"github.com/palemoky/fight-the-landlord/internal/apperrors"
+	"github.com/palemoky/fight-the-landlord/internal/game/room"
 )
+
+type practiceMatchPayload struct {
+	Difficulty string `json:"difficulty"`
+}
 
 // handleCreateRoom 处理创建房间
 func (h *Handler) handleCreateRoom(client types.ClientInterface) {
@@ -107,22 +113,50 @@ func (h *Handler) handleQuickMatch(client types.ClientInterface) {
 }
 
 // handlePracticeMatch 处理人机练习
-func (h *Handler) handlePracticeMatch(client types.ClientInterface) {
+func (h *Handler) handlePracticeMatch(client types.ClientInterface, msg *protocol.Message) {
 	if h.server.IsMaintenanceMode() {
 		client.SendMessage(codec.NewErrorMessageWithText(
 			protocol.ErrCodeServerMaintenance, "服务器维护中，暂停人机练习"))
 		return
 	}
+	difficulty := parsePracticeDifficulty(msg)
 
 	if client.GetRoom() != "" {
-		h.roomManager.LeaveRoom(client)
+		r := h.roomManager.GetRoom(client.GetRoom())
+		if r != nil && r.State == room.RoomStateEnded {
+			h.matcher.PracticeMatchWithDifficulty(client, difficulty)
+			return
+		}
+		if err := h.matcher.AddBotToRoomWithDifficulty(client, difficulty); err != nil {
+			client.SendMessage(codec.NewErrorMessageWithText(protocol.ErrCodeUnknown, err.Error()))
+		}
+		return
 	}
 
-	h.matcher.PracticeMatch(client)
+	h.matcher.PracticeMatchWithDifficulty(client, difficulty)
+}
+
+func parsePracticeDifficulty(msg *protocol.Message) string {
+	if msg == nil || len(msg.Payload) == 0 {
+		return ""
+	}
+	var payload practiceMatchPayload
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return ""
+	}
+	switch payload.Difficulty {
+	case "easy", "normal", "hard":
+		return payload.Difficulty
+	default:
+		return ""
+	}
 }
 
 // handleReady 处理准备
 func (h *Handler) handleReady(client types.ClientInterface, ready bool) {
+	if gameSession := h.GetGameSession(client.GetRoom()); gameSession != nil && gameSession.SetTrusteeship(client.GetID(), ready) {
+		return
+	}
 	err := h.roomManager.SetPlayerReady(client, ready)
 	if err != nil {
 		var gameErr *apperrors.GameError
@@ -131,5 +165,12 @@ func (h *Handler) handleReady(client types.ClientInterface, ready bool) {
 		} else {
 			client.SendMessage(codec.NewErrorMessageWithText(protocol.ErrCodeUnknown, err.Error()))
 		}
+	}
+}
+
+func (h *Handler) handleReplay(client types.ClientInterface) {
+	err := h.roomManager.RestartRoom(client)
+	if err != nil {
+		client.SendMessage(codec.NewErrorMessageWithText(protocol.ErrCodeUnknown, err.Error()))
 	}
 }

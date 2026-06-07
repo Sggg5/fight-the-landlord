@@ -130,23 +130,7 @@ func encodeServerSystemMessages(msgType protocol.MessageType, payload any) (prot
 			Maintenance: p.Maintenance,
 		}, true
 	case protocol.MsgStatsResult:
-		p := payload.(protocol.StatsResultPayload)
-		return &pb.StatsResultPayload{
-			PlayerId:      p.PlayerID,
-			PlayerName:    p.PlayerName,
-			TotalGames:    int64(p.TotalGames),
-			Wins:          int64(p.Wins),
-			Losses:        int64(p.Losses),
-			WinRate:       p.WinRate,
-			LandlordGames: int64(p.LandlordGames),
-			LandlordWins:  int64(p.LandlordWins),
-			FarmerGames:   int64(p.FarmerGames),
-			FarmerWins:    int64(p.FarmerWins),
-			Score:         int64(p.Score),
-			Rank:          int64(p.Rank),
-			CurrentStreak: int64(p.CurrentStreak),
-			MaxWinStreak:  int64(p.MaxWinStreak),
-		}, true
+		return nil, false
 	case protocol.MsgLeaderboardResult:
 		p := payload.(protocol.LeaderboardResultPayload)
 		return &pb.LeaderboardResultPayload{

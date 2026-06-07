@@ -20,6 +20,9 @@ func (gs *GameSession) HandlePlayCards(playerID string, cardInfos []protocol.Car
 	if gs.state != GameStatePlaying {
 		return apperrors.ErrGameNotStart
 	}
+	if gs.room == nil {
+		return apperrors.ErrRoomNotFound
+	}
 
 	currentPlayer := gs.players[gs.currentPlayer]
 	if currentPlayer.ID != playerID {
@@ -104,6 +107,9 @@ func (gs *GameSession) HandlePass(playerID string) error {
 	if gs.state != GameStatePlaying {
 		return apperrors.ErrGameNotStart
 	}
+	if gs.room == nil {
+		return apperrors.ErrRoomNotFound
+	}
 
 	currentPlayer := gs.players[gs.currentPlayer]
 	if currentPlayer.ID != playerID {
@@ -177,6 +183,9 @@ func (gs *GameSession) GetPlayerCardsCount(playerID string) int {
 
 // notifyPlayTurn 通知当前玩家出牌
 func (gs *GameSession) notifyPlayTurn() {
+	if gs.room == nil || gs.currentPlayer < 0 || gs.currentPlayer >= len(gs.players) {
+		return
+	}
 	player := gs.players[gs.currentPlayer]
 	mustPlay := gs.lastPlayerIdx == gs.currentPlayer || gs.lastPlayedHand.IsEmpty()
 
@@ -195,4 +204,7 @@ func (gs *GameSession) notifyPlayTurn() {
 		CanBeat:  canBeat,
 	}))
 	gs.startPlayTimer()
+	if gs.trusteeship[player.ID] {
+		gs.scheduleTrusteeship(player.ID)
+	}
 }

@@ -63,6 +63,11 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// 创建客户端
 	client := NewClient(s, conn)
+	// 检查 WebSocket URL 参数，支持 JSON 协议
+	if r.URL.Query().Get("format") == "json" {
+		client.useJSON = true
+	}
+	log.Printf("Client protocol: json=%v", client.useJSON)
 	client.IP = clientIP // 记录客户端 IP
 	s.registerClient(client)
 

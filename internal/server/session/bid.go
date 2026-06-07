@@ -25,6 +25,9 @@ func (gs *GameSession) HandleBid(playerID string, bid bool) error {
 	if gs.state != GameStateBidding {
 		return apperrors.ErrGameNotStart
 	}
+	if gs.room == nil {
+		return apperrors.ErrRoomNotFound
+	}
 
 	currentPlayer := gs.players[gs.currentBidder]
 	if currentPlayer.ID != playerID {
@@ -113,6 +116,9 @@ func (gs *GameSession) nextGrabber(from int) int {
 
 // broadcastBidResult 广播叫/抢地主结果
 func (gs *GameSession) broadcastBidResult(player *GamePlayer, bid, isGrab bool) {
+	if gs.room == nil {
+		return
+	}
 	gs.room.Broadcast(codec.MustNewMessage(protocol.MsgBidResult, protocol.BidResultPayload{
 		PlayerID:   player.ID,
 		PlayerName: player.Name,
@@ -124,6 +130,10 @@ func (gs *GameSession) broadcastBidResult(player *GamePlayer, bid, isGrab bool) 
 
 // setLandlord 设置地主
 func (gs *GameSession) setLandlord(idx int) {
+	room := gs.room
+	if room == nil || idx < 0 || idx >= len(gs.players) {
+		return
+	}
 	landlord := gs.players[idx]
 	landlord.IsLandlord = true
 
@@ -134,10 +144,12 @@ func (gs *GameSession) setLandlord(idx int) {
 	})
 
 	// 更新房间玩家状态
-	gs.room.Players[landlord.ID].IsLandlord = true
+	if rp := room.Players[landlord.ID]; rp != nil {
+		rp.IsLandlord = true
+	}
 
 	// 广播地主信息（含底倍）
-	gs.room.Broadcast(codec.MustNewMessage(protocol.MsgLandlord, protocol.LandlordPayload{
+	room.Broadcast(codec.MustNewMessage(protocol.MsgLandlord, protocol.LandlordPayload{
 		PlayerID:    landlord.ID,
 		PlayerName:  landlord.Name,
 		BottomCards: convert.CardsToInfos(gs.bottomCards),
@@ -145,16 +157,17 @@ func (gs *GameSession) setLandlord(idx int) {
 	}))
 
 	// 给地主发送更新后的手牌
-	rp := gs.room.Players[landlord.ID]
-	client := rp.Client
-	client.SendMessage(codec.MustNewMessage(protocol.MsgDealCards, protocol.DealCardsPayload{
-		Cards:       convert.CardsToInfos(landlord.Hand),
-		BottomCards: convert.CardsToInfos(gs.bottomCards),
-	}))
+	rp := room.Players[landlord.ID]
+	if rp != nil && rp.Client != nil {
+		rp.Client.SendMessage(codec.MustNewMessage(protocol.MsgDealCards, protocol.DealCardsPayload{
+			Cards:       convert.CardsToInfos(landlord.Hand),
+			BottomCards: convert.CardsToInfos(gs.bottomCards),
+		}))
+	}
 
 	// 开始游戏，地主先出牌
 	gs.state = GameStatePlaying
-	gs.room.State = RoomStatePlaying
+	room.State = RoomStatePlaying
 	gs.currentPlayer = idx
 	gs.lastPlayerIdx = idx
 
@@ -163,6 +176,9 @@ func (gs *GameSession) setLandlord(idx int) {
 
 // notifyBidTurn 通知当前玩家叫/抢地主
 func (gs *GameSession) notifyBidTurn() {
+	if gs.room == nil {
+		return
+	}
 	player := gs.players[gs.currentBidder]
 	gs.room.Broadcast(codec.MustNewMessage(protocol.MsgBidTurn, protocol.BidTurnPayload{
 		PlayerID:   player.ID,
@@ -171,4 +187,7 @@ func (gs *GameSession) notifyBidTurn() {
 		Multiplier: gs.bidMultiplier,
 	}))
 	gs.startBidTimer()
+	if gs.trusteeship[player.ID] {
+		gs.scheduleTrusteeship(player.ID)
+	}
 }

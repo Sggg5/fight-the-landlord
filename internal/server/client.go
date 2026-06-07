@@ -50,6 +50,7 @@ type Client struct {
 	Name   string // 玩家昵称
 	RoomID string // 当前所在房间 ID
 	IP     string // 客户端 IP 地址
+	useJSON bool  // 是否使用 JSON 协议
 
 	server *Server
 	conn   *websocket.Conn
@@ -85,7 +86,7 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		_, message, err := c.conn.ReadMessage()
+		msgType, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("读取错误: %v", err)
@@ -109,17 +110,36 @@ func (c *Client) ReadPump() {
 			c.SendMessage(codec.NewErrorMessageWithText(protocol.ErrCodeRateLimit, "请求过于频繁，请放慢速度"))
 		}
 
-		// 解析消息
-		msg, err := codec.Decode(message)
-		if err != nil {
-			log.Printf("消息解析错误: %v", err)
-			c.SendMessage(codec.NewErrorMessage(protocol.ErrCodeInvalidMsg))
-			continue
+		// 根据消息类型选择解码方式
+		var msg *protocol.Message
+		if msgType == websocket.TextMessage {
+			// JSON 文本消息 - Using unified decoder
+			var decodeErr error
+			msg, decodeErr = decodeJSONMessage(message)
+			if decodeErr != nil {
+				log.Printf("JSON 消息解析错误: %v", decodeErr)
+				c.SendMessage(codec.NewErrorMessage(protocol.ErrCodeInvalidMsg))
+				continue
+			}
+			c.mu.Lock()
+			c.useJSON = true
+			c.mu.Unlock()
+		} else {
+			// Protobuf 二进制消息
+			var decodeErr error
+			msg, decodeErr = codec.Decode(message)
+			if decodeErr != nil {
+				log.Printf("Protobuf 二进制消息解析错误: %v", decodeErr)
+				c.SendMessage(codec.NewErrorMessage(protocol.ErrCodeInvalidMsg))
+				continue
+			}
 		}
 
-		// 交给处理器处理，处理完后归还到池
+		// 交给处理器处理
 		c.server.handler.Handle(c, msg)
-		codec.PutMessage(msg)
+		if msgType != websocket.TextMessage {
+			codec.PutMessage(msg)
+		}
 	}
 }
 
@@ -141,7 +161,16 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.BinaryMessage)
+			c.mu.RLock()
+			useJSON := c.useJSON
+			c.mu.RUnlock()
+
+			msgType := websocket.BinaryMessage
+			if useJSON {
+				msgType = websocket.TextMessage
+			}
+
+			w, err := c.conn.NextWriter(msgType)
 			if err != nil {
 				return
 			}
@@ -167,9 +196,17 @@ func (c *Client) SendMessage(msg *protocol.Message) {
 		c.mu.RUnlock()
 		return
 	}
+	useJSON := c.useJSON
 	c.mu.RUnlock()
 
-	data, err := codec.Encode(msg)
+	var data []byte
+	var err error
+
+	if useJSON {
+		data, err = msgToJSON(msg)
+	} else {
+		data, err = codec.Encode(msg)
+	}
 	if err != nil {
 		log.Printf("消息编码错误: %v", err)
 		return
@@ -230,3 +267,5 @@ func (c *Client) GetRoom() string {
 func (c *Client) GetID() string   { return c.ID }
 func (c *Client) GetName() string { return c.Name }
 func (c *Client) IsBot() bool     { return false }
+
+
